@@ -65,8 +65,7 @@ a{color:var(--clicks);text-decoration:none}
 .tab{font-size:13px;font-weight:500;padding:8px 16px;border-radius:8px 8px 0 0;color:var(--muted);cursor:pointer;border:1px solid transparent;border-bottom:none;transition:all .15s;position:relative;bottom:-1px}
 .tab:hover{color:var(--text)}
 .tab.active{color:var(--accent);border-color:var(--line);background:var(--panel);border-bottom-color:var(--panel)}
-.tab-panel{display:none;padding-top:24px}
-.tab-panel.active{display:block}
+.tab-panel{padding-top:24px}
 
 /* controls */
 input,textarea,select{width:100%;background:var(--panel2);border:1px solid var(--line2);color:var(--text);border-radius:8px;padding:10px 12px;font-family:var(--mono);font-size:13px;outline:none;resize:vertical}
@@ -395,7 +394,9 @@ function switchTab(key){
   document.querySelectorAll('.nav-sub').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.tab-panel').forEach(x=>x.classList.add('hide'));
   document.querySelector(`.nav-sub[data-tab="${key}"]`)?.classList.add('active');
-  $('#tab-'+key).classList.remove('hide');
+  const panel=$('#tab-'+key);
+  panel.classList.remove('hide');
+  panel.style.display='block';
 }
 document.querySelectorAll('.nav-sub').forEach(t=>{t.onclick=()=>switchTab(t.dataset.tab);});
 
