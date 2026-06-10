@@ -154,6 +154,21 @@ button.ok{background:#166534;color:var(--ok);border:1px solid #166534}
 /* api notice */
 .api-notice{background:#1a1206;border:1px solid #4a3010;border-radius:10px;padding:14px 16px;font-size:13px;color:var(--warn);margin-bottom:16px}
 .api-notice a{color:var(--warn)}
+
+/* ad cards */
+.ad-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-top:16px}
+.ad-card{background:var(--panel2);border:1px solid var(--line2);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.ad-card .ad-page{font-family:var(--mono);font-size:10px;color:var(--accent);text-transform:uppercase;letter-spacing:.08em}
+.ad-card .ad-copy{font-size:13px;color:var(--text);line-height:1.5;flex:1;display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden}
+.ad-card .ad-meta{font-size:11px;color:var(--faint);font-family:var(--mono)}
+.ad-card .ad-actions{display:flex;gap:8px;flex-wrap:wrap}
+.fetch-section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-top:10px}
+.fetch-section .fetch-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:4px}
+.fetch-section .fetch-title{font-weight:600;font-size:14px}
+.fetch-section .fetch-links{display:flex;gap:8px;flex-wrap:wrap}
+.fetch-loading{color:var(--muted);font-size:13px;font-style:italic;padding:12px 0}
+.no-token-notice{background:#1a1206;border:1px solid #4a3010;border-radius:10px;padding:12px 14px;font-size:13px;color:var(--warn)}
+.no-token-notice a{color:var(--warn)}
 </style>
 </head>
 <body>
@@ -249,7 +264,7 @@ button.ok{background:#166534;color:var(--ok);border:1px solid #166534}
         <h3>Track a competitor</h3>
         <div class="grid2">
           <label class="fld"><span class="k">Brand name</span><input id="c_name" placeholder="Kiddopia"/></label>
-          <label class="fld"><span class="k">Meta Ad Library URL</span><input id="c_url" placeholder="https://facebook.com/ads/library/?advertiser_id=…"/></label>
+          <label class="fld"><span class="k">Country code <em>— for ad fetch</em></span><input id="c_country" placeholder="IN" style="width:80px"/></label>
         </div>
         <label class="fld"><span class="k">Notes</span><input id="c_notes" placeholder="Focus on: hooks, parent pain points, animation style"/></label>
         <div class="actions">
@@ -257,8 +272,14 @@ button.ok{background:#166534;color:var(--ok);border:1px solid #166534}
           <span class="msg" id="cMsg">Added!</span>
         </div>
       </div>
-      <p class="eyebrow">Your competitors</p>
-      <div id="compList" style="display:flex;flex-direction:column;gap:10px"></div>
+
+      <div id="noTokenNotice" class="no-token-notice hide">
+        ⚠ Add <b>META_ACCESS_TOKEN</b> to your <a href="https://dashboard.render.com" target="_blank">Render environment variables</a> to auto-fetch ads.
+        Get a token at <a href="https://developers.facebook.com/tools/explorer/" target="_blank">graph.facebook.com/explorer</a> — select <b>ads_read</b> permission.
+      </div>
+
+      <p class="eyebrow" style="margin-top:16px">Your competitors</p>
+      <div id="compList" style="display:flex;flex-direction:column;gap:16px"></div>
     </div>
   </div>
 </main>
@@ -363,7 +384,7 @@ document.querySelectorAll('.nav-sub').forEach(t=>{t.onclick=()=>switchTab(t.data
 // ===== COMPETITORS =====
 async function loadCompetitors(){
   const list=await api('/api/creative/competitors');
-  // populate dropdowns
+  // populate research dropdown
   const sel=$('#r_competitor');
   const prev=sel.value;
   sel.innerHTML='<option value="">— select —</option>';
@@ -374,23 +395,86 @@ async function loadCompetitors(){
   if(!list.length){box.innerHTML='<div class="empty-state">No competitors yet. Add Kiddopia, ABCmouse, Cocomelon to get started.</div>';return;}
   box.innerHTML='';
   list.forEach(c=>{
-    const d=document.createElement('div');d.className='comp-card';
-    d.innerHTML=`<div class="comp-name">${esc(c.name)}</div>
-      ${c.notes?`<div style="font-size:12px;color:var(--muted);flex:1">${esc(c.notes)}</div>`:''}
-      <div class="comp-actions">
-        ${c.ad_lib_url?`<a href="${esc(c.ad_lib_url)}" target="_blank" class="nav-link" style="font-size:12px">View ads ↗</a>`:''}
-        <button class="danger sm del-comp" data-id="${c.id}">remove</button>
-      </div>`;
+    const country=c.notes?.match(/\b[A-Z]{2}\b/)?.[0]||'IN';
+    const googleUrl=`https://adstransparency.google.com/?region=anywhere&advertiser_name=${encodeURIComponent(c.name)}`;
+    const metaUrl=`https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&q=${encodeURIComponent(c.name)}&search_type=keyword_unordered`;
+    const d=document.createElement('div');d.className='fetch-section';
+    d.innerHTML=`
+      <div class="fetch-head">
+        <div>
+          <div class="fetch-title">${esc(c.name)}</div>
+          ${c.notes?`<div style="font-size:12px;color:var(--muted);margin-top:2px">${esc(c.notes)}</div>`:''}
+        </div>
+        <div class="fetch-links">
+          <button class="ghost sm fetch-meta-btn" data-name="${esc(c.name)}" data-country="${country}">⚡ Fetch Meta Ads</button>
+          <a href="${googleUrl}" target="_blank" class="ghost sm" style="display:inline-flex;align-items:center;padding:5px 10px;border-radius:8px;border:1px solid var(--line2);color:var(--muted);font-size:12px;font-weight:500;text-decoration:none">Google Ads ↗</a>
+          <a href="${metaUrl}" target="_blank" class="ghost sm" style="display:inline-flex;align-items:center;padding:5px 10px;border-radius:8px;border:1px solid var(--line2);color:var(--muted);font-size:12px;font-weight:500;text-decoration:none">Meta Library ↗</a>
+          <button class="danger sm del-comp" data-id="${c.id}">remove</button>
+        </div>
+      </div>
+      <div class="ad-results" id="ads-${c.id}"></div>`;
     box.appendChild(d);
   });
+
   box.querySelectorAll('.del-comp').forEach(b=>b.onclick=async()=>{
     await api('/api/creative/competitors/'+b.dataset.id,{method:'DELETE'});loadCompetitors();
   });
+
+  box.querySelectorAll('.fetch-meta-btn').forEach(b=>b.onclick=async()=>{
+    const resultsBox=b.closest('.fetch-section').querySelector('.ad-results');
+    resultsBox.innerHTML='<div class="fetch-loading">⚡ Fetching active ads from Meta…</div>';
+    b.disabled=true;
+    try{
+      const data=await api(`/api/creative/fetch-ads?competitor=${encodeURIComponent(b.dataset.name)}&country=${b.dataset.country}`);
+      if(data.error){
+        resultsBox.innerHTML=`<div class="no-token-notice">${esc(data.error)}${data.error.includes('META_ACCESS_TOKEN')?` — get a token at <a href="https://developers.facebook.com/tools/explorer/" target="_blank">graph.facebook.com/explorer</a>`:''}</div>`;
+        if(data.error.includes('META_ACCESS_TOKEN'))$('#noTokenNotice').classList.remove('hide');
+      } else if(!data.ads?.length){
+        resultsBox.innerHTML='<div class="fetch-loading">No active ads found for this competitor right now.</div>';
+      } else {
+        renderAds(data.ads, resultsBox, b.dataset.name);
+      }
+    }catch(e){resultsBox.innerHTML=`<div class="no-token-notice">${e.message}</div>`;}
+    b.disabled=false;
+  });
 }
+
+function renderAds(ads, box, competitorName){
+  const grid=document.createElement('div');grid.className='ad-grid';
+  ads.forEach(ad=>{
+    const bodies=ad.ad_creative_bodies||[];
+    const titles=ad.ad_creative_link_titles||[];
+    const copy=[...titles,...bodies].filter(Boolean).join('\n\n').slice(0,400);
+    const date=ad.ad_creation_time?new Date(ad.ad_creation_time).toLocaleDateString():'';
+    const card=document.createElement('div');card.className='ad-card';
+    card.innerHTML=`
+      <div class="ad-page">${esc(ad.page_name||competitorName)}</div>
+      <div class="ad-copy">${esc(copy||'(no copy available)')}</div>
+      <div class="ad-meta">${date}</div>
+      <div class="ad-actions">
+        ${ad.ad_snapshot_url?`<a href="${esc(ad.ad_snapshot_url)}" target="_blank" class="ghost sm" style="display:inline-flex;align-items:center;padding:5px 10px;border-radius:8px;border:1px solid var(--line2);color:var(--muted);font-size:12px;font-weight:500;text-decoration:none">Preview ↗</a>`:''}
+        <button class="sm" style="background:var(--panel);border:1px solid var(--line2);color:var(--muted);font-size:12px" data-copy="${escAttr(copy)}" data-comp="${escAttr(competitorName)}">+ Save to Research</button>
+      </div>`;
+    grid.appendChild(card);
+  });
+  box.innerHTML='';box.appendChild(grid);
+  box.querySelectorAll('button[data-copy]').forEach(b=>b.onclick=async()=>{
+    await api('/api/creative/research',{method:'POST',body:JSON.stringify({
+      title:`${b.dataset.comp} — fetched ad`,
+      content:b.dataset.copy,
+      competitor:b.dataset.comp,
+      format:'Meta Ad'
+    })});
+    b.textContent='✓ Saved';b.disabled=true;
+    loadResearch();
+  });
+}
+
 $('#addComp').onclick=async()=>{
   const name=$('#c_name').value.trim();if(!name)return;
-  await api('/api/creative/competitors',{method:'POST',body:JSON.stringify({name,ad_lib_url:$('#c_url').value,notes:$('#c_notes').value})});
-  ['c_name','c_url','c_notes'].forEach(id=>$('#'+id).value='');
+  const country=$('#c_country').value.trim()||'IN';
+  await api('/api/creative/competitors',{method:'POST',body:JSON.stringify({name,ad_lib_url:'',notes:country})});
+  ['c_name','c_country','c_notes'].forEach(id=>{ const el=$('#'+id); if(el) el.value=''; });
   flash('#cMsg');loadCompetitors();
 };
 

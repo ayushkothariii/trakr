@@ -212,6 +212,34 @@ app.get('/api/stats/:alias', requireAdmin, async (req, res) => {
 
 app.get('/api/whoami', requireAdmin, (req, res) => res.json({ ok: true }));
 
+// ========== META AD LIBRARY FETCH ==========
+app.get('/api/creative/fetch-ads', requireAdmin, async (req, res) => {
+  const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
+  if (!META_ACCESS_TOKEN) return res.status(400).json({ error: 'META_ACCESS_TOKEN not set. Add it to your Render environment variables.' });
+
+  const { competitor, country = 'IN' } = req.query;
+  if (!competitor) return res.status(400).json({ error: 'competitor required' });
+
+  const params = new URLSearchParams({
+    access_token: META_ACCESS_TOKEN,
+    search_terms: competitor,
+    ad_type: 'ALL',
+    ad_active_status: 'ACTIVE',
+    fields: 'id,ad_creation_time,ad_creative_bodies,ad_creative_link_titles,ad_creative_link_descriptions,ad_snapshot_url,page_name,impressions,spend,currency',
+    limit: '12'
+  });
+  params.append('ad_reached_countries[]', country);
+
+  try {
+    const r = await fetch(`https://graph.facebook.com/v19.0/ads_archive?${params}`);
+    const data = await r.json();
+    if (data.error) return res.status(400).json({ error: data.error.message });
+    res.json({ ads: data.data || [], paging: data.paging });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ========== CREATIVE PIPELINE ==========
 
 // --- Competitors ---
