@@ -264,9 +264,9 @@ app.get('/api/creative/research', requireAdmin, async (req, res) => {
   res.json(r.rows);
 });
 app.post('/api/creative/research', requireAdmin, async (req, res) => {
-  const { title, content, competitor, hook, format } = req.body;
-  if (!title || !content) return res.status(400).json({ error: 'title and content required' });
-  await db.execute({ sql: 'INSERT INTO creative_research (title, content, competitor, hook, format, created_at) VALUES (?,?,?,?,?,?)', args: [title, content, competitor||'', hook||'', format||'', Date.now()] });
+  const { title, content, competitor, hook, format, headline, caption, cta, platform } = req.body;
+  if (!title) return res.status(400).json({ error: 'title required' });
+  await db.execute({ sql: 'INSERT INTO creative_research (title, content, competitor, hook, format, headline, caption, cta, platform, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)', args: [title, content||'', competitor||'', hook||'', format||'', headline||'', caption||'', cta||'', platform||'', Date.now()] });
   res.json({ ok: true });
 });
 app.delete('/api/creative/research/:id', requireAdmin, async (req, res) => {

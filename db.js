@@ -75,6 +75,17 @@ async function initDb() {
       updated_at  INTEGER NOT NULL
     );
   `);
+
+  // Migrations — safe to run every boot
+  const newCols = [
+    ['creative_research', 'headline', 'TEXT DEFAULT ""'],
+    ['creative_research', 'caption',  'TEXT DEFAULT ""'],
+    ['creative_research', 'cta',      'TEXT DEFAULT ""'],
+    ['creative_research', 'platform', 'TEXT DEFAULT ""'],
+  ];
+  for (const [table, col, def] of newCols) {
+    try { await db.execute(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`); } catch(e) {}
+  }
 }
 
 const sha = (s) => crypto.createHash('sha256').update(String(s)).digest('hex');

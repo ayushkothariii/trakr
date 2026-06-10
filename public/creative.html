@@ -227,13 +227,22 @@ button.ok{background:#166534;color:var(--ok);border:1px solid #166534}
     <!-- RESEARCH TAB -->
     <div class="tab-panel hide" id="tab-research">
       <div class="form">
-        <h3>Add research observation</h3>
+        <h3>Add ad observation</h3>
         <div class="grid2">
-          <label class="fld"><span class="k">Title</span><input id="r_title" placeholder="Kiddopia hook — problem-solution"/></label>
+          <label class="fld"><span class="k">Title <em>— your label for this ad</em></span><input id="r_title" placeholder="Kiddopia — worried parent hook"/></label>
           <label class="fld"><span class="k">Competitor</span>
             <select id="r_competitor"><option value="">— select —</option></select>
           </label>
-          <label class="fld"><span class="k">Hook / Opening line spotted</span><input id="r_hook" placeholder="e.g. Is your child struggling with letters?"/></label>
+          <label class="fld"><span class="k">Platform</span>
+            <select id="r_platform">
+              <option value="">— platform —</option>
+              <option>Meta Feed</option>
+              <option>Meta Reels</option>
+              <option>Instagram Story</option>
+              <option>YouTube Pre-roll</option>
+              <option>TikTok</option>
+            </select>
+          </label>
           <label class="fld"><span class="k">Format</span>
             <select id="r_format">
               <option value="">— format —</option>
@@ -247,7 +256,16 @@ button.ok{background:#166534;color:var(--ok);border:1px solid #166534}
             </select>
           </label>
         </div>
-        <label class="fld"><span class="k">Full observation</span><textarea id="r_content" rows="3" placeholder="Describe what made this ad work — visuals, pacing, emotion, CTA…"></textarea></label>
+        <label class="fld"><span class="k">Headline <em>— the bold text at the top of the ad</em></span>
+          <input id="r_headline" placeholder="e.g. Help your child learn ABCs in 2 weeks!"/></label>
+        <label class="fld"><span class="k">Hook / Opening line <em>— first 3 seconds of video or first sentence</em></span>
+          <input id="r_hook" placeholder="e.g. Is your child starting school soon?"/></label>
+        <label class="fld"><span class="k">Primary text / Caption <em>— the body copy of the ad</em></span>
+          <textarea id="r_caption" rows="2" placeholder="e.g. 98% of parents saw improvement in just 30 days. Try free today!"></textarea></label>
+        <label class="fld"><span class="k">CTA <em>— the button or closing line</em></span>
+          <input id="r_cta" placeholder="e.g. Download Free · Learn More · Start Free Trial"/></label>
+        <label class="fld"><span class="k">Your observations <em>— what made it work?</em></span>
+          <textarea id="r_content" rows="2" placeholder="e.g. Strong urgency with school deadline. Warm visuals. Parent testimonial builds trust."></textarea></label>
         <div class="actions">
           <button id="addResearch">Save observation</button>
           <span class="msg" id="rMsg">Saved!</span>
@@ -485,14 +503,28 @@ async function loadResearch(){
   if(!list.length){box.innerHTML='<div class="empty-state">No observations yet. Watch competitor ads and capture what works.</div>';return;}
   box.innerHTML='';
   list.forEach(r=>{
+    const researchText=[
+      r.headline?`Headline: ${r.headline}`:'',
+      r.hook?`Hook: ${r.hook}`:'',
+      r.caption?`Caption: ${r.caption}`:'',
+      r.cta?`CTA: ${r.cta}`:'',
+      r.content?`Observations: ${r.content}`:'',
+    ].filter(Boolean).join('\n');
     const d=document.createElement('div');d.className='card';
     d.innerHTML=`<div class="top"><div class="info">
       <div class="title">${esc(r.title)}</div>
-      <div class="sub">${r.competitor?`<span class="badge competitor">${esc(r.competitor)}</span> `:''} ${r.format?`<span class="badge research">${esc(r.format)}</span>`:''}</div>
-      ${r.hook?`<div style="font-size:12px;color:var(--ok);margin-top:8px;font-family:var(--mono)">Hook: "${esc(r.hook)}"</div>`:''}
-      <div class="body">${esc(r.content)}</div>
-      <div class="foot">
-        <button class="ghost sm use-research" data-content="${escAttr(r.title+'\n'+r.content+(r.hook?'\nHook: '+r.hook:''))}">Use in script →</button>
+      <div class="sub" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+        ${r.competitor?`<span class="badge competitor">${esc(r.competitor)}</span>`:''}
+        ${r.format?`<span class="badge research">${esc(r.format)}</span>`:''}
+        ${r.platform?`<span class="badge" style="background:var(--panel2);color:var(--muted);border:1px solid var(--line2)">${esc(r.platform)}</span>`:''}
+      </div>
+      ${r.headline?`<div style="margin-top:10px"><span style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--faint)">Headline</span><div style="font-size:13px;font-weight:600;color:var(--text);margin-top:2px">${esc(r.headline)}</div></div>`:''}
+      ${r.hook?`<div style="margin-top:8px"><span style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--faint)">Hook</span><div style="font-size:13px;color:var(--ok);font-family:var(--mono);margin-top:2px">"${esc(r.hook)}"</div></div>`:''}
+      ${r.caption?`<div style="margin-top:8px"><span style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--faint)">Caption</span><div style="font-size:13px;color:var(--muted);margin-top:2px">${esc(r.caption)}</div></div>`:''}
+      ${r.cta?`<div style="margin-top:8px"><span style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--faint)">CTA</span><div style="font-size:13px;color:var(--installs);font-weight:600;margin-top:2px">${esc(r.cta)}</div></div>`:''}
+      ${r.content?`<div style="margin-top:8px"><span style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--faint)">Observations</span><div style="font-size:12px;color:var(--muted);margin-top:2px">${esc(r.content)}</div></div>`:''}
+      <div class="foot" style="margin-top:12px">
+        <button class="ghost sm use-research" data-content="${escAttr(researchText)}">Use in script →</button>
         <button class="danger sm del-res" data-id="${r.id}" style="margin-left:auto">delete</button>
       </div>
     </div></div>`;
@@ -508,11 +540,21 @@ async function loadResearch(){
   });
 }
 $('#addResearch').onclick=async()=>{
-  const title=$('#r_title').value.trim(),content=$('#r_content').value.trim();
-  if(!title||!content)return;
-  await api('/api/creative/research',{method:'POST',body:JSON.stringify({title,content,competitor:$('#r_competitor').value,hook:$('#r_hook').value,format:$('#r_format').value})});
-  ['r_title','r_content','r_hook'].forEach(id=>$('#'+id).value='');
-  $('#r_competitor').value='';$('#r_format').value='';
+  const title=$('#r_title').value.trim();
+  if(!title)return;
+  await api('/api/creative/research',{method:'POST',body:JSON.stringify({
+    title,
+    content:$('#r_content').value,
+    competitor:$('#r_competitor').value,
+    hook:$('#r_hook').value,
+    format:$('#r_format').value,
+    headline:$('#r_headline').value,
+    caption:$('#r_caption').value,
+    cta:$('#r_cta').value,
+    platform:$('#r_platform').value,
+  })});
+  ['r_title','r_content','r_hook','r_headline','r_caption','r_cta'].forEach(id=>$('#'+id).value='');
+  ['r_competitor','r_format','r_platform'].forEach(id=>$('#'+id).value='');
   flash('#rMsg');loadResearch();
 };
 
