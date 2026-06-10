@@ -16,30 +16,47 @@
   --clicks:#4CC2FF;--installs:#FF8A3D;
   --mono:'JetBrains Mono',ui-monospace,monospace;
   --sans:'Inter',system-ui,sans-serif;
+  --sidebar:220px;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
-a{color:var(--clicks);text-decoration:none}
-.wrap{max-width:1100px;margin:0 auto;padding:0 20px 80px}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;display:flex;min-height:100vh}
 
-/* header */
-header{display:flex;align-items:center;gap:12px;padding:26px 0 22px;border-bottom:1px solid var(--line)}
-.mark{width:30px;height:30px;flex:none;position:relative}
-.mark span{position:absolute;inset:0;border-radius:50%;border:2px solid var(--accent);opacity:.35}
-.mark span:nth-child(2){inset:6px;border-color:var(--accent);opacity:.6}
-.mark span:nth-child(3){inset:12px;border-color:var(--accent);opacity:1;animation:pulse 2.6s ease-in-out infinite}
+/* SIDEBAR */
+.sidebar{width:var(--sidebar);flex:none;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:10}
+.sidebar-logo{padding:22px 18px 18px;border-bottom:1px solid var(--line)}
+.sidebar-logo .mark{width:26px;height:26px;position:relative;margin-bottom:10px}
+.sidebar-logo .mark span{position:absolute;inset:0;border-radius:50%;border:2px solid var(--accent);opacity:.35}
+.sidebar-logo .mark span:nth-child(2){inset:5px;opacity:.6}
+.sidebar-logo .mark span:nth-child(3){inset:10px;border-color:var(--accent);opacity:1;animation:pulse 2.6s ease-in-out infinite}
 @keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(.7);opacity:.5}}
-h1{font-size:16px;font-weight:600;margin:0;letter-spacing:-.01em}
-h1 b{font-family:var(--mono);font-weight:700}
-.tag{font-size:12px;color:var(--muted);margin-top:1px}
-.header-right{margin-left:auto;display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:12px;color:var(--faint)}
+.sidebar-logo h1{font-family:var(--mono);font-size:15px;font-weight:700}
+.sidebar-logo .sub{font-size:11px;color:var(--faint);margin-top:2px}
+.sidebar-section{padding:16px 10px 4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--faint)}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;margin:1px 6px;cursor:pointer;font-size:13px;font-weight:500;color:var(--muted);transition:all .15s;text-decoration:none}
+.nav-item:hover{background:var(--panel2);color:var(--text)}
+.nav-item.active{background:var(--panel2);color:var(--text);border:1px solid var(--line2)}
+.nav-item .icon{font-size:15px;width:20px;text-align:center;flex:none}
+.nav-sub{padding-left:42px;font-size:12px;color:var(--faint);cursor:pointer;margin:1px 6px;border-radius:6px;padding:7px 12px 7px 42px;transition:all .15s}
+.nav-sub:hover{color:var(--muted)}
+.nav-sub.active{color:var(--accent)}
+.sidebar-bottom{margin-top:auto;padding:14px 10px;border-top:1px solid var(--line)}
+.sidebar-user{font-size:11px;color:var(--muted);padding:8px 12px;display:flex;align-items:center;gap:8px}
+.sidebar-user .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);flex:none}
+a{color:var(--clicks);text-decoration:none}
+.main{margin-left:var(--sidebar);flex:1;padding:30px 32px 80px;max-width:calc(100vw - var(--sidebar))}
+
+/* page header */
+.page-header{margin-bottom:24px;padding-bottom:20px;border-bottom:1px solid var(--line)}
+.page-header h2{font-size:18px;font-weight:600}
+.page-header p{font-size:13px;color:var(--muted);margin-top:2px}
 .nav-link{font-family:var(--sans);font-size:13px;color:var(--muted);padding:6px 12px;border-radius:8px;border:1px solid var(--line2);font-weight:500;transition:color .15s,border-color .15s}
 .nav-link:hover{color:var(--text);border-color:var(--faint)}
 
 /* gate */
-.gate{max-width:380px;margin:90px auto;text-align:center}
-.gate h2{font-weight:600;font-size:18px;margin:0 0 6px}
-.gate p{color:var(--muted);font-size:13px;margin:0 0 18px}
+.gate-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;width:100%;position:fixed;inset:0;background:var(--bg);z-index:50}
+.gate{max-width:360px;width:100%;text-align:center;padding:0 20px}
+.gate h2{font-weight:700;font-size:20px;margin:0 0 6px;font-family:var(--mono)}
+.gate p{color:var(--muted);font-size:13px;margin:0 0 20px}
 .err{color:#ff7a7a;font-size:12.5px;font-family:var(--mono);margin-top:8px;min-height:16px}
 .hide{display:none!important}
 
@@ -140,40 +157,51 @@ button.ok{background:#166534;color:var(--ok);border:1px solid #166534}
 </style>
 </head>
 <body>
-<div class="wrap">
 
-  <!-- GATE -->
-  <div id="gate" class="gate">
+<!-- GATE -->
+<div class="gate-wrap" id="gate">
+  <div class="gate">
+    <div style="font-size:28px;margin-bottom:12px">✦</div>
     <h2>trackr</h2>
     <p>Enter your admin token to open the creative studio.</p>
     <input id="token" type="password" placeholder="ADMIN_TOKEN" autocomplete="current-password"/>
     <div class="err" id="gateErr"></div>
-    <div style="margin-top:14px"><button id="enter">Open studio</button></div>
+    <div style="margin-top:14px"><button id="enter" style="background:var(--accent);color:#150b2a">Open studio</button></div>
+  </div>
+</div>
+
+<!-- SIDEBAR -->
+<nav class="sidebar hide" id="sidebar">
+  <div class="sidebar-logo">
+    <div class="mark"><span></span><span></span><span></span></div>
+    <h1>trackr</h1>
+    <div class="sub">creative studio</div>
   </div>
 
-  <!-- APP -->
-  <div id="app" class="hide">
-    <header>
-      <div class="mark"><span></span><span></span><span></span></div>
-      <div>
-        <h1><b>trackr</b> / creative studio</h1>
-        <div class="tag">research → script → production → distribution</div>
-      </div>
-      <div class="header-right">
-        <a href="/" class="nav-link">← attribution</a>
-        <button class="ghost" id="logout" style="font-size:12px;padding:6px 12px">sign out</button>
-      </div>
-    </header>
+  <div class="sidebar-section">Analytics</div>
+  <a class="nav-item" href="/"><span class="icon">🔗</span> Attribution</a>
+  <a class="nav-item active" href="/creative.html"><span class="icon">✦</span> Creative Studio</a>
 
-    <!-- TABS -->
-    <div class="tabs">
-      <div class="tab active" data-tab="pipeline">Pipeline</div>
-      <div class="tab" data-tab="research">Research</div>
-      <div class="tab" data-tab="competitors">Competitors</div>
-    </div>
+  <div class="sidebar-section">Studio</div>
+  <div class="nav-sub active" data-tab="pipeline">Pipeline</div>
+  <div class="nav-sub" data-tab="research">Research</div>
+  <div class="nav-sub" data-tab="competitors">Competitors</div>
+
+  <div class="sidebar-bottom">
+    <div class="sidebar-user"><span class="dot"></span><span id="origin" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span></div>
+    <button class="ghost" id="logout" style="width:calc(100% - 12px);margin:4px 6px;font-size:12px;padding:8px">Sign out</button>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<main class="main hide" id="app">
+  <div class="page-header">
+    <h2>Creative Studio</h2>
+    <p>Research → Script → Production → Distribution</p>
+  </div>
 
     <!-- PIPELINE TAB -->
-    <div class="tab-panel active" id="tab-pipeline">
+    <div class="tab-panel active" id="tab-pipeline" style="display:block">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px">
         <p class="eyebrow" style="margin:0">Script pipeline</p>
         <button id="newScriptBtn">+ New Script</button>
@@ -182,7 +210,7 @@ button.ok{background:#166534;color:var(--ok);border:1px solid #166534}
     </div>
 
     <!-- RESEARCH TAB -->
-    <div class="tab-panel" id="tab-research">
+    <div class="tab-panel hide" id="tab-research">
       <div class="form">
         <h3>Add research observation</h3>
         <div class="grid2">
@@ -216,7 +244,7 @@ button.ok{background:#166534;color:var(--ok);border:1px solid #166534}
     </div>
 
     <!-- COMPETITORS TAB -->
-    <div class="tab-panel" id="tab-competitors">
+    <div class="tab-panel hide" id="tab-competitors">
       <div class="form">
         <h3>Track a competitor</h3>
         <div class="grid2">
@@ -233,7 +261,7 @@ button.ok{background:#166534;color:var(--ok);border:1px solid #166534}
       <div id="compList" style="display:flex;flex-direction:column;gap:10px"></div>
     </div>
   </div>
-</div>
+</main>
 
 <!-- SCRIPT MODAL -->
 <div class="modal-bg hide" id="scriptModal">
@@ -303,8 +331,17 @@ async function api(path,opts={}){
 }
 
 // Gate
-function showGate(msg){$('#app').classList.add('hide');$('#gate').classList.remove('hide');if(msg)$('#gateErr').textContent=msg;$('#token').focus();}
-function showApp(){$('#gate').classList.add('hide');$('#app').classList.remove('hide');loadAll();}
+function showGate(msg){
+  $('#app').classList.add('hide');$('#sidebar').classList.add('hide');
+  $('#gate').classList.remove('hide');
+  if(msg)$('#gateErr').textContent=msg;$('#token').focus();
+}
+function showApp(){
+  $('#gate').classList.add('hide');
+  $('#sidebar').classList.remove('hide');$('#app').classList.remove('hide');
+  $('#origin').textContent=location.hostname;
+  loadAll();
+}
 $('#enter').onclick=tryToken;
 $('#token').addEventListener('keydown',e=>{if(e.key==='Enter')tryToken();});
 async function tryToken(){
@@ -314,15 +351,14 @@ async function tryToken(){
 }
 $('#logout').onclick=()=>{localStorage.removeItem('trackr_token');TOKEN='';$('#token').value='';showGate('');};
 
-// Tabs
-document.querySelectorAll('.tab').forEach(t=>{
-  t.onclick=()=>{
-    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
-    document.querySelectorAll('.tab-panel').forEach(x=>x.classList.remove('active'));
-    t.classList.add('active');
-    $('#tab-'+t.dataset.tab).classList.add('active');
-  };
-});
+// Sidebar sub-nav
+function switchTab(key){
+  document.querySelectorAll('.nav-sub').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(x=>x.classList.add('hide'));
+  document.querySelector(`.nav-sub[data-tab="${key}"]`)?.classList.add('active');
+  $('#tab-'+key).classList.remove('hide');
+}
+document.querySelectorAll('.nav-sub').forEach(t=>{t.onclick=()=>switchTab(t.dataset.tab);});
 
 // ===== COMPETITORS =====
 async function loadCompetitors(){
@@ -384,10 +420,7 @@ async function loadResearch(){
   box.querySelectorAll('.use-research').forEach(b=>b.onclick=()=>{
     openModal();
     $('#m_research').value=b.dataset.content;
-    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
-    document.querySelectorAll('.tab-panel').forEach(x=>x.classList.remove('active'));
-    document.querySelector('[data-tab="pipeline"]').classList.add('active');
-    $('#tab-pipeline').classList.add('active');
+    switchTab('pipeline');
   });
 }
 $('#addResearch').onclick=async()=>{
