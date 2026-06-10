@@ -1,0 +1,512 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>trackr — creative studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0B0E14;--panel:#131823;--panel2:#0F141D;--line:#222A38;--line2:#2C3648;
+  --text:#E7EAF1;--muted:#7C8597;--faint:#525C6E;
+  --accent:#C084FC;--accentd:#7C3AED;
+  --ok:#4ADE80;--warn:#FBBF24;--danger:#F87171;
+  --clicks:#4CC2FF;--installs:#FF8A3D;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+  --sans:'Inter',system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+a{color:var(--clicks);text-decoration:none}
+.wrap{max-width:1100px;margin:0 auto;padding:0 20px 80px}
+
+/* header */
+header{display:flex;align-items:center;gap:12px;padding:26px 0 22px;border-bottom:1px solid var(--line)}
+.mark{width:30px;height:30px;flex:none;position:relative}
+.mark span{position:absolute;inset:0;border-radius:50%;border:2px solid var(--accent);opacity:.35}
+.mark span:nth-child(2){inset:6px;border-color:var(--accent);opacity:.6}
+.mark span:nth-child(3){inset:12px;border-color:var(--accent);opacity:1;animation:pulse 2.6s ease-in-out infinite}
+@keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(.7);opacity:.5}}
+h1{font-size:16px;font-weight:600;margin:0;letter-spacing:-.01em}
+h1 b{font-family:var(--mono);font-weight:700}
+.tag{font-size:12px;color:var(--muted);margin-top:1px}
+.header-right{margin-left:auto;display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:12px;color:var(--faint)}
+.nav-link{font-family:var(--sans);font-size:13px;color:var(--muted);padding:6px 12px;border-radius:8px;border:1px solid var(--line2);font-weight:500;transition:color .15s,border-color .15s}
+.nav-link:hover{color:var(--text);border-color:var(--faint)}
+
+/* gate */
+.gate{max-width:380px;margin:90px auto;text-align:center}
+.gate h2{font-weight:600;font-size:18px;margin:0 0 6px}
+.gate p{color:var(--muted);font-size:13px;margin:0 0 18px}
+.err{color:#ff7a7a;font-size:12.5px;font-family:var(--mono);margin-top:8px;min-height:16px}
+.hide{display:none!important}
+
+/* tabs */
+.tabs{display:flex;gap:4px;margin:24px 0 0;border-bottom:1px solid var(--line);padding-bottom:0}
+.tab{font-size:13px;font-weight:500;padding:8px 16px;border-radius:8px 8px 0 0;color:var(--muted);cursor:pointer;border:1px solid transparent;border-bottom:none;transition:all .15s;position:relative;bottom:-1px}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--accent);border-color:var(--line);background:var(--panel);border-bottom-color:var(--panel)}
+.tab-panel{display:none;padding-top:24px}
+.tab-panel.active{display:block}
+
+/* controls */
+input,textarea,select{width:100%;background:var(--panel2);border:1px solid var(--line2);color:var(--text);border-radius:8px;padding:10px 12px;font-family:var(--mono);font-size:13px;outline:none;resize:vertical}
+input:focus,textarea:focus,select:focus{border-color:var(--accent)}
+input::placeholder,textarea::placeholder{color:var(--faint)}
+select option{background:var(--panel2)}
+label.fld{display:block;margin:0 0 12px}
+label.fld .k{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:5px}
+button{cursor:pointer;border:0;border-radius:8px;font-family:var(--sans);font-weight:600;font-size:13px;padding:9px 16px;background:var(--accent);color:#150b2a;transition:opacity .15s}
+button:hover{opacity:.85}
+button:disabled{opacity:.4;cursor:default}
+button.ghost{background:transparent;border:1px solid var(--line2);color:var(--muted);font-weight:500}
+button.ghost:hover{color:var(--text);border-color:var(--faint)}
+button.danger{background:transparent;border:1px solid var(--line2);color:var(--faint)}
+button.danger:hover{color:var(--danger);border-color:#5a2020}
+button.sm{padding:5px 10px;font-size:12px}
+button.ok{background:#166534;color:var(--ok);border:1px solid #166534}
+
+/* form panel */
+.form{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:24px}
+.form h3{font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:16px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 18px}
+@media(max-width:640px){.grid2{grid-template-columns:1fr}}
+.actions{display:flex;align-items:center;gap:10px;margin-top:4px;flex-wrap:wrap}
+.msg{font-family:var(--mono);font-size:12px;color:var(--ok);opacity:0;transition:opacity .3s}
+.msg.show{opacity:1}
+
+/* section heading */
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);margin:0 0 14px}
+
+/* cards */
+.cards{display:flex;flex-direction:column;gap:10px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.card .top{display:flex;align-items:flex-start;gap:10px}
+.card .info{flex:1;min-width:0}
+.card .title{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .sub{font-size:12px;color:var(--muted);margin-top:3px}
+.card .body{font-size:13px;color:var(--muted);margin-top:10px;line-height:1.6;white-space:pre-wrap}
+.card .foot{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center}
+.badge{display:inline-block;font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:4px;font-weight:700;letter-spacing:.05em}
+.badge.research{background:#1e3a2f;color:var(--ok)}
+.badge.competitor{background:#1e2a3a;color:var(--clicks)}
+.empty-state{color:var(--muted);font-size:13px;text-align:center;padding:40px;border:1px dashed var(--line2);border-radius:14px}
+
+/* kanban */
+.kanban{display:flex;gap:14px;overflow-x:auto;padding-bottom:16px;align-items:flex-start}
+.kanban::-webkit-scrollbar{height:6px}
+.kanban::-webkit-scrollbar-track{background:var(--panel2)}
+.kanban::-webkit-scrollbar-thumb{background:var(--line2);border-radius:3px}
+.kol{flex:0 0 240px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+.kol-head{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between}
+.kol-count{font-family:var(--mono);font-size:12px;background:var(--panel2);padding:1px 7px;border-radius:10px;color:var(--muted)}
+.kol-cards{display:flex;flex-direction:column;gap:8px;min-height:40px}
+.kcard{background:var(--panel2);border:1px solid var(--line2);border-radius:10px;padding:11px 13px;cursor:pointer;transition:border-color .15s}
+.kcard:hover{border-color:var(--accent)}
+.kcard .kt{font-size:13px;font-weight:600;line-height:1.3}
+.kcard .km{font-size:11px;color:var(--muted);margin-top:5px;display:flex;gap:8px;flex-wrap:wrap}
+.kcard .kp{font-family:var(--mono);font-size:10px;padding:2px 6px;border-radius:4px;background:var(--line);color:var(--muted)}
+
+/* status colors */
+.s-brief{color:#94A3B8}.s-script{color:var(--clicks)}.s-review{color:var(--warn)}
+.s-approved{color:var(--ok)}.s-production{color:var(--installs)}.s-live{color:var(--accent)}
+
+/* modal */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal{background:var(--panel);border:1px solid var(--line2);border-radius:16px;padding:24px;width:100%;max-width:640px;max-height:90vh;overflow-y:auto}
+.modal h2{font-size:16px;font-weight:600;margin-bottom:20px;display:flex;align-items:center;gap:10px}
+.modal h2 button{margin-left:auto;background:transparent;border:0;color:var(--muted);font-size:20px;padding:0;line-height:1}
+.modal h2 button:hover{color:var(--text)}
+.modal .actions{margin-top:16px}
+
+/* AI output */
+.ai-out{background:var(--panel2);border:1px solid var(--line2);border-radius:10px;padding:16px;font-family:var(--mono);font-size:12.5px;line-height:1.8;white-space:pre-wrap;color:var(--text);margin-top:12px;min-height:80px}
+.ai-loading{color:var(--muted);font-style:italic}
+
+/* competitor card */
+.comp-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:12px}
+.comp-name{font-weight:600;font-size:14px;flex:1}
+.comp-actions{display:flex;gap:8px;align-items:center}
+
+/* platform pills */
+.platforms{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.pill{font-size:11px;padding:2px 8px;border-radius:10px;border:1px solid var(--line2);color:var(--muted);font-family:var(--mono)}
+
+/* api notice */
+.api-notice{background:#1a1206;border:1px solid #4a3010;border-radius:10px;padding:14px 16px;font-size:13px;color:var(--warn);margin-bottom:16px}
+.api-notice a{color:var(--warn)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- GATE -->
+  <div id="gate" class="gate">
+    <h2>trackr</h2>
+    <p>Enter your admin token to open the creative studio.</p>
+    <input id="token" type="password" placeholder="ADMIN_TOKEN" autocomplete="current-password"/>
+    <div class="err" id="gateErr"></div>
+    <div style="margin-top:14px"><button id="enter">Open studio</button></div>
+  </div>
+
+  <!-- APP -->
+  <div id="app" class="hide">
+    <header>
+      <div class="mark"><span></span><span></span><span></span></div>
+      <div>
+        <h1><b>trackr</b> / creative studio</h1>
+        <div class="tag">research → script → production → distribution</div>
+      </div>
+      <div class="header-right">
+        <a href="/" class="nav-link">← attribution</a>
+        <button class="ghost" id="logout" style="font-size:12px;padding:6px 12px">sign out</button>
+      </div>
+    </header>
+
+    <!-- TABS -->
+    <div class="tabs">
+      <div class="tab active" data-tab="pipeline">Pipeline</div>
+      <div class="tab" data-tab="research">Research</div>
+      <div class="tab" data-tab="competitors">Competitors</div>
+    </div>
+
+    <!-- PIPELINE TAB -->
+    <div class="tab-panel active" id="tab-pipeline">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px">
+        <p class="eyebrow" style="margin:0">Script pipeline</p>
+        <button id="newScriptBtn">+ New Script</button>
+      </div>
+      <div class="kanban" id="kanban"></div>
+    </div>
+
+    <!-- RESEARCH TAB -->
+    <div class="tab-panel" id="tab-research">
+      <div class="form">
+        <h3>Add research observation</h3>
+        <div class="grid2">
+          <label class="fld"><span class="k">Title</span><input id="r_title" placeholder="Kiddopia hook — problem-solution"/></label>
+          <label class="fld"><span class="k">Competitor</span>
+            <select id="r_competitor"><option value="">— select —</option></select>
+          </label>
+          <label class="fld"><span class="k">Hook / Opening line spotted</span><input id="r_hook" placeholder="e.g. Is your child struggling with letters?"/></label>
+          <label class="fld"><span class="k">Format</span>
+            <select id="r_format">
+              <option value="">— format —</option>
+              <option>Problem-Solution</option>
+              <option>Before-After</option>
+              <option>Testimonial</option>
+              <option>Demo</option>
+              <option>Story</option>
+              <option>UGC</option>
+              <option>Animation</option>
+            </select>
+          </label>
+        </div>
+        <label class="fld"><span class="k">Full observation</span><textarea id="r_content" rows="3" placeholder="Describe what made this ad work — visuals, pacing, emotion, CTA…"></textarea></label>
+        <div class="actions">
+          <button id="addResearch">Save observation</button>
+          <span class="msg" id="rMsg">Saved!</span>
+        </div>
+      </div>
+
+      <p class="eyebrow">Saved observations</p>
+      <div class="cards" id="researchList"></div>
+    </div>
+
+    <!-- COMPETITORS TAB -->
+    <div class="tab-panel" id="tab-competitors">
+      <div class="form">
+        <h3>Track a competitor</h3>
+        <div class="grid2">
+          <label class="fld"><span class="k">Brand name</span><input id="c_name" placeholder="Kiddopia"/></label>
+          <label class="fld"><span class="k">Meta Ad Library URL</span><input id="c_url" placeholder="https://facebook.com/ads/library/?advertiser_id=…"/></label>
+        </div>
+        <label class="fld"><span class="k">Notes</span><input id="c_notes" placeholder="Focus on: hooks, parent pain points, animation style"/></label>
+        <div class="actions">
+          <button id="addComp">Add competitor</button>
+          <span class="msg" id="cMsg">Added!</span>
+        </div>
+      </div>
+      <p class="eyebrow">Your competitors</p>
+      <div id="compList" style="display:flex;flex-direction:column;gap:10px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- SCRIPT MODAL -->
+<div class="modal-bg hide" id="scriptModal">
+  <div class="modal">
+    <h2 id="modalTitle">New Script <button id="closeModal">×</button></h2>
+
+    <label class="fld"><span class="k">Title</span><input id="m_title" placeholder="e.g. Diwali — parent worry hook"/></label>
+    <div class="grid2">
+      <label class="fld"><span class="k">Status</span>
+        <select id="m_status">
+          <option value="brief">Brief</option>
+          <option value="script">Script Draft</option>
+          <option value="review">In Review</option>
+          <option value="approved">Approved</option>
+          <option value="production">In Production</option>
+          <option value="live">Live</option>
+        </select>
+      </label>
+      <label class="fld"><span class="k">Platform</span>
+        <select id="m_platform">
+          <option value="">All platforms</option>
+          <option>Meta</option>
+          <option>YouTube</option>
+          <option>TikTok</option>
+          <option>Instagram Reels</option>
+        </select>
+      </label>
+    </div>
+    <label class="fld"><span class="k">Brief / Idea</span><textarea id="m_brief" rows="3" placeholder="What's the hook? What pain point? What format?"></textarea></label>
+    <label class="fld"><span class="k">Script</span><textarea id="m_script" rows="6" placeholder="Full script goes here — or use AI to generate one below"></textarea></label>
+    <label class="fld"><span class="k">Notes</span><textarea id="m_notes" rows="2" placeholder="Feedback, references, links…"></textarea></label>
+
+    <!-- AI Generator -->
+    <div style="border-top:1px solid var(--line);margin:16px 0;padding-top:16px">
+      <p class="eyebrow" style="margin-bottom:10px">✦ AI Script Generator</p>
+      <div class="api-notice" id="apiNotice" style="display:none">
+        Add <b>ANTHROPIC_API_KEY</b> to your <a href="https://dashboard.render.com" target="_blank">Render environment variables</a> to enable AI generation.
+        Get a key at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>.
+      </div>
+      <label class="fld"><span class="k">Research to use (optional — paste observations or select)</span>
+        <textarea id="m_research" rows="2" placeholder="Paste competitor observations or what's trending…"></textarea>
+      </label>
+      <button id="generateBtn">✦ Generate script with AI</button>
+      <div class="ai-out hide" id="aiOut"></div>
+      <div style="display:flex;gap:8px;margin-top:8px" id="aiActions" class="hide">
+        <button class="ok sm" id="useScript">Use this script</button>
+        <button class="ghost sm" id="regenScript">Regenerate</button>
+      </div>
+    </div>
+
+    <div class="actions" style="border-top:1px solid var(--line);padding-top:16px">
+      <button id="saveScript">Save script</button>
+      <button class="danger sm" id="deleteScript" style="margin-left:auto">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+let TOKEN=localStorage.getItem('trackr_token')||'';
+let editingId=null;
+
+async function api(path,opts={}){
+  const r=await fetch(path,{...opts,headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json',...(opts.headers||{})}});
+  if(r.status===401)throw new Error('unauthorized');
+  return r.json();
+}
+
+// Gate
+function showGate(msg){$('#app').classList.add('hide');$('#gate').classList.remove('hide');if(msg)$('#gateErr').textContent=msg;$('#token').focus();}
+function showApp(){$('#gate').classList.add('hide');$('#app').classList.remove('hide');loadAll();}
+$('#enter').onclick=tryToken;
+$('#token').addEventListener('keydown',e=>{if(e.key==='Enter')tryToken();});
+async function tryToken(){
+  TOKEN=$('#token').value.trim();
+  try{const r=await api('/api/whoami');if(r.ok){localStorage.setItem('trackr_token',TOKEN);showApp();}}
+  catch(e){$('#gateErr').textContent='That token was rejected.';}
+}
+$('#logout').onclick=()=>{localStorage.removeItem('trackr_token');TOKEN='';$('#token').value='';showGate('');};
+
+// Tabs
+document.querySelectorAll('.tab').forEach(t=>{
+  t.onclick=()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    $('#tab-'+t.dataset.tab).classList.add('active');
+  };
+});
+
+// ===== COMPETITORS =====
+async function loadCompetitors(){
+  const list=await api('/api/creative/competitors');
+  // populate dropdowns
+  const sel=$('#r_competitor');
+  const prev=sel.value;
+  sel.innerHTML='<option value="">— select —</option>';
+  list.forEach(c=>{const o=document.createElement('option');o.value=c.name;o.textContent=c.name;sel.appendChild(o);});
+  if(prev)sel.value=prev;
+  // render list
+  const box=$('#compList');
+  if(!list.length){box.innerHTML='<div class="empty-state">No competitors yet. Add Kiddopia, ABCmouse, Cocomelon to get started.</div>';return;}
+  box.innerHTML='';
+  list.forEach(c=>{
+    const d=document.createElement('div');d.className='comp-card';
+    d.innerHTML=`<div class="comp-name">${esc(c.name)}</div>
+      ${c.notes?`<div style="font-size:12px;color:var(--muted);flex:1">${esc(c.notes)}</div>`:''}
+      <div class="comp-actions">
+        ${c.ad_lib_url?`<a href="${esc(c.ad_lib_url)}" target="_blank" class="nav-link" style="font-size:12px">View ads ↗</a>`:''}
+        <button class="danger sm del-comp" data-id="${c.id}">remove</button>
+      </div>`;
+    box.appendChild(d);
+  });
+  box.querySelectorAll('.del-comp').forEach(b=>b.onclick=async()=>{
+    await api('/api/creative/competitors/'+b.dataset.id,{method:'DELETE'});loadCompetitors();
+  });
+}
+$('#addComp').onclick=async()=>{
+  const name=$('#c_name').value.trim();if(!name)return;
+  await api('/api/creative/competitors',{method:'POST',body:JSON.stringify({name,ad_lib_url:$('#c_url').value,notes:$('#c_notes').value})});
+  ['c_name','c_url','c_notes'].forEach(id=>$('#'+id).value='');
+  flash('#cMsg');loadCompetitors();
+};
+
+// ===== RESEARCH =====
+async function loadResearch(){
+  const list=await api('/api/creative/research');
+  const box=$('#researchList');
+  if(!list.length){box.innerHTML='<div class="empty-state">No observations yet. Watch competitor ads and capture what works.</div>';return;}
+  box.innerHTML='';
+  list.forEach(r=>{
+    const d=document.createElement('div');d.className='card';
+    d.innerHTML=`<div class="top"><div class="info">
+      <div class="title">${esc(r.title)}</div>
+      <div class="sub">${r.competitor?`<span class="badge competitor">${esc(r.competitor)}</span> `:''} ${r.format?`<span class="badge research">${esc(r.format)}</span>`:''}</div>
+      ${r.hook?`<div style="font-size:12px;color:var(--ok);margin-top:8px;font-family:var(--mono)">Hook: "${esc(r.hook)}"</div>`:''}
+      <div class="body">${esc(r.content)}</div>
+      <div class="foot">
+        <button class="ghost sm use-research" data-content="${escAttr(r.title+'\n'+r.content+(r.hook?'\nHook: '+r.hook:''))}">Use in script →</button>
+        <button class="danger sm del-res" data-id="${r.id}" style="margin-left:auto">delete</button>
+      </div>
+    </div></div>`;
+    box.appendChild(d);
+  });
+  box.querySelectorAll('.del-res').forEach(b=>b.onclick=async()=>{
+    await api('/api/creative/research/'+b.dataset.id,{method:'DELETE'});loadResearch();
+  });
+  box.querySelectorAll('.use-research').forEach(b=>b.onclick=()=>{
+    openModal();
+    $('#m_research').value=b.dataset.content;
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(x=>x.classList.remove('active'));
+    document.querySelector('[data-tab="pipeline"]').classList.add('active');
+    $('#tab-pipeline').classList.add('active');
+  });
+}
+$('#addResearch').onclick=async()=>{
+  const title=$('#r_title').value.trim(),content=$('#r_content').value.trim();
+  if(!title||!content)return;
+  await api('/api/creative/research',{method:'POST',body:JSON.stringify({title,content,competitor:$('#r_competitor').value,hook:$('#r_hook').value,format:$('#r_format').value})});
+  ['r_title','r_content','r_hook'].forEach(id=>$('#'+id).value='');
+  $('#r_competitor').value='';$('#r_format').value='';
+  flash('#rMsg');loadResearch();
+};
+
+// ===== PIPELINE / KANBAN =====
+const STAGES=[
+  {key:'brief',label:'Brief',color:'#94A3B8'},
+  {key:'script',label:'Script',color:'#4CC2FF'},
+  {key:'review',label:'Review',color:'#FBBF24'},
+  {key:'approved',label:'Approved',color:'#4ADE80'},
+  {key:'production',label:'Production',color:'#FF8A3D'},
+  {key:'live',label:'Live',color:'#C084FC'},
+];
+async function loadKanban(){
+  const scripts=await api('/api/creative/scripts');
+  const board=$('#kanban');board.innerHTML='';
+  STAGES.forEach(st=>{
+    const cards=scripts.filter(s=>s.status===st.key);
+    const col=document.createElement('div');col.className='kol';
+    col.innerHTML=`<div class="kol-head" style="color:${st.color}">${st.label}<span class="kol-count">${cards.length}</span></div>
+      <div class="kol-cards" id="col-${st.key}"></div>`;
+    board.appendChild(col);
+    const colBox=col.querySelector('.kol-cards');
+    if(!cards.length){colBox.innerHTML=`<div style="font-size:12px;color:var(--faint);text-align:center;padding:12px 0">empty</div>`;return;}
+    cards.forEach(s=>{
+      const kc=document.createElement('div');kc.className='kcard';
+      kc.innerHTML=`<div class="kt">${esc(s.title)}</div>
+        <div class="km">
+          ${s.platform?`<span class="kp">${esc(s.platform)}</span>`:''}
+          <span style="color:var(--faint)">${timeAgo(s.updated_at)}</span>
+        </div>`;
+      kc.onclick=()=>openModal(s);
+      colBox.appendChild(kc);
+    });
+  });
+}
+
+// ===== MODAL =====
+function openModal(script){
+  editingId=script?.id||null;
+  $('#modalTitle').childNodes[0].textContent=script?'Edit Script ':'New Script ';
+  $('#m_title').value=script?.title||'';
+  $('#m_status').value=script?.status||'brief';
+  $('#m_platform').value=script?.platform||'';
+  $('#m_brief').value=script?.brief||'';
+  $('#m_script').value=script?.script||'';
+  $('#m_notes').value=script?.notes||'';
+  $('#m_research').value='';
+  $('#aiOut').classList.add('hide');$('#aiActions').classList.add('hide');
+  $('#deleteScript').style.display=script?'inline-block':'none';
+  $('#scriptModal').classList.remove('hide');
+  setTimeout(()=>$('#m_title').focus(),50);
+}
+$('#newScriptBtn').onclick=()=>openModal();
+$('#closeModal').onclick=()=>$('#scriptModal').classList.add('hide');
+$('#scriptModal').onclick=e=>{if(e.target===$('#scriptModal'))$('#scriptModal').classList.add('hide');};
+
+$('#saveScript').onclick=async()=>{
+  const body={title:$('#m_title').value.trim(),brief:$('#m_brief').value,script:$('#m_script').value,status:$('#m_status').value,platform:$('#m_platform').value,notes:$('#m_notes').value};
+  if(!body.title)return;
+  if(editingId){await api('/api/creative/scripts/'+editingId,{method:'PUT',body:JSON.stringify(body)});}
+  else{await api('/api/creative/scripts',{method:'POST',body:JSON.stringify(body)});}
+  $('#scriptModal').classList.add('hide');loadKanban();
+};
+$('#deleteScript').onclick=async()=>{
+  if(!confirm('Delete this script?'))return;
+  await api('/api/creative/scripts/'+editingId,{method:'DELETE'});
+  $('#scriptModal').classList.add('hide');loadKanban();
+};
+
+// AI Generate
+$('#generateBtn').onclick=generateScript;
+$('#regenScript').onclick=generateScript;
+async function generateScript(){
+  const brief=$('#m_brief').value.trim()||$('#m_title').value.trim();
+  const aiOut=$('#aiOut');const aiActions=$('#aiActions');
+  aiOut.classList.remove('hide');aiActions.classList.add('hide');
+  aiOut.className='ai-out ai-loading';aiOut.textContent='✦ Generating script…';
+  $('#generateBtn').disabled=true;
+  try{
+    const r=await api('/api/creative/generate',{method:'POST',body:JSON.stringify({brief,research:$('#m_research').value})});
+    if(r.error){
+      aiOut.className='ai-out';aiOut.style.color='var(--danger)';aiOut.textContent=r.error;
+      if(r.error.includes('ANTHROPIC_API_KEY'))$('#apiNotice').style.display='block';
+    } else {
+      aiOut.className='ai-out';aiOut.style.color='';aiOut.textContent=r.script;
+      aiActions.classList.remove('hide');
+    }
+  }catch(e){aiOut.className='ai-out';aiOut.textContent='Error: '+e.message;}
+  $('#generateBtn').disabled=false;
+}
+$('#useScript').onclick=()=>{$('#m_script').value=$('#aiOut').textContent;$('#m_status').value='script';};
+
+// ===== HELPERS =====
+function esc(s){return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function escAttr(s){return String(s||'').replace(/"/g,'&quot;');}
+function flash(sel){const el=$(sel);el.classList.add('show');setTimeout(()=>el.classList.remove('show'),3000);}
+function timeAgo(ts){
+  const d=Date.now()-Number(ts);
+  if(d<60000)return 'just now';
+  if(d<3600000)return Math.floor(d/60000)+'m ago';
+  if(d<86400000)return Math.floor(d/3600000)+'h ago';
+  return Math.floor(d/86400000)+'d ago';
+}
+
+async function loadAll(){
+  await Promise.all([loadKanban(),loadResearch(),loadCompetitors()]);
+}
+
+// Boot
+if(TOKEN){api('/api/whoami').then(r=>r.ok?showApp():showGate('')).catch(()=>showGate(''));}
+else showGate('');
+</script>
+</body>
+</html>

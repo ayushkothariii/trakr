@@ -212,6 +212,95 @@ app.get('/api/stats/:alias', requireAdmin, async (req, res) => {
 
 app.get('/api/whoami', requireAdmin, (req, res) => res.json({ ok: true }));
 
+// ========== CREATIVE PIPELINE ==========
+
+// --- Competitors ---
+app.get('/api/creative/competitors', requireAdmin, async (req, res) => {
+  const r = await db.execute('SELECT * FROM creative_competitors ORDER BY created_at DESC');
+  res.json(r.rows);
+});
+app.post('/api/creative/competitors', requireAdmin, async (req, res) => {
+  const { name, ad_lib_url, notes } = req.body;
+  if (!name) return res.status(400).json({ error: 'name required' });
+  await db.execute({ sql: 'INSERT INTO creative_competitors (name, ad_lib_url, notes, created_at) VALUES (?,?,?,?)', args: [name, ad_lib_url||'', notes||'', Date.now()] });
+  res.json({ ok: true });
+});
+app.delete('/api/creative/competitors/:id', requireAdmin, async (req, res) => {
+  await db.execute({ sql: 'DELETE FROM creative_competitors WHERE id = ?', args: [req.params.id] });
+  res.json({ ok: true });
+});
+
+// --- Research ---
+app.get('/api/creative/research', requireAdmin, async (req, res) => {
+  const r = await db.execute('SELECT * FROM creative_research ORDER BY created_at DESC');
+  res.json(r.rows);
+});
+app.post('/api/creative/research', requireAdmin, async (req, res) => {
+  const { title, content, competitor, hook, format } = req.body;
+  if (!title || !content) return res.status(400).json({ error: 'title and content required' });
+  await db.execute({ sql: 'INSERT INTO creative_research (title, content, competitor, hook, format, created_at) VALUES (?,?,?,?,?,?)', args: [title, content, competitor||'', hook||'', format||'', Date.now()] });
+  res.json({ ok: true });
+});
+app.delete('/api/creative/research/:id', requireAdmin, async (req, res) => {
+  await db.execute({ sql: 'DELETE FROM creative_research WHERE id = ?', args: [req.params.id] });
+  res.json({ ok: true });
+});
+
+// --- Scripts ---
+app.get('/api/creative/scripts', requireAdmin, async (req, res) => {
+  const r = await db.execute('SELECT * FROM creative_scripts ORDER BY updated_at DESC');
+  res.json(r.rows);
+});
+app.post('/api/creative/scripts', requireAdmin, async (req, res) => {
+  const { title, brief, script, status, platform, notes } = req.body;
+  if (!title) return res.status(400).json({ error: 'title required' });
+  const now = Date.now();
+  const r = await db.execute({ sql: 'INSERT INTO creative_scripts (title, brief, script, status, platform, notes, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)', args: [title, brief||'', script||'', status||'brief', platform||'', notes||'', now, now] });
+  res.json({ ok: true, id: Number(r.lastInsertRowid) });
+});
+app.put('/api/creative/scripts/:id', requireAdmin, async (req, res) => {
+  const { title, brief, script, status, platform, notes } = req.body;
+  await db.execute({ sql: 'UPDATE creative_scripts SET title=?, brief=?, script=?, status=?, platform=?, notes=?, updated_at=? WHERE id=?', args: [title, brief||'', script||'', status, platform||'', notes||'', Date.now(), req.params.id] });
+  res.json({ ok: true });
+});
+app.delete('/api/creative/scripts/:id', requireAdmin, async (req, res) => {
+  await db.execute({ sql: 'DELETE FROM creative_scripts WHERE id = ?', args: [req.params.id] });
+  res.json({ ok: true });
+});
+
+// --- AI Script Generation ---
+app.post('/api/creative/generate', requireAdmin, async (req, res) => {
+  const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+  if (!ANTHROPIC_API_KEY) return res.status(400).json({ error: 'ANTHROPIC_API_KEY not set in environment variables.' });
+  const { brief, research } = req.body;
+  if (!brief) return res.status(400).json({ error: 'brief required' });
+  const prompt = `You are an expert creative script writer for kids educational apps (like Kiddopia, ABCmouse, Cocomelon). Write a punchy 30-second video ad script for all platforms (Meta, YouTube, TikTok).
+
+Brief: ${brief}
+${research ? `Competitor insights: ${research}` : ''}
+
+Format your response exactly like this:
+HOOK (0-3s): [opening line that stops the scroll]
+SCENE 1 (3-10s): [visual description] | VOICEOVER: [text]
+SCENE 2 (10-20s): [visual description] | VOICEOVER: [text]
+SCENE 3 (20-27s): [visual description] | VOICEOVER: [text]
+CTA (27-30s): [call to action text]
+CAPTION: [social media caption with emojis]`;
+
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 1024, messages: [{ role: 'user', content: prompt }] })
+    });
+    const data = await r.json();
+    if (data.error) return res.status(500).json({ error: data.error.message });
+    res.json({ script: data.content[0].text });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 const PORT = process.env.PORT || 3000;

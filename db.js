@@ -44,6 +44,36 @@ async function initDb() {
     );
 
     CREATE INDEX IF NOT EXISTS idx_installs_alias ON installs(alias);
+
+    CREATE TABLE IF NOT EXISTS creative_competitors (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      name        TEXT NOT NULL,
+      ad_lib_url  TEXT,
+      notes       TEXT,
+      created_at  INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS creative_research (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      title        TEXT NOT NULL,
+      content      TEXT NOT NULL,
+      competitor   TEXT,
+      hook         TEXT,
+      format       TEXT,
+      created_at   INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS creative_scripts (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      title       TEXT NOT NULL,
+      brief       TEXT,
+      script      TEXT,
+      status      TEXT NOT NULL DEFAULT 'brief',
+      platform    TEXT,
+      notes       TEXT,
+      created_at  INTEGER NOT NULL,
+      updated_at  INTEGER NOT NULL
+    );
   `);
 }
 
