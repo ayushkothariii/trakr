@@ -16,7 +16,13 @@
 const express = require('express');
 const path = require('path');
 const crypto = require('crypto');
+const { exec } = require('child_process');
+const fs = require('fs');
+const os = require('os');
+const multer = require('multer');
 const { db, sha, initDb } = require('./db');
+
+const upload = multer({ dest: os.tmpdir(), limits: { fileSize: 150 * 1024 * 1024 } });
 
 const app = express();
 app.set('trust proxy', true);
@@ -328,6 +334,120 @@ CAPTION: [social media caption with emojis]`;
     res.status(500).json({ error: e.message });
   }
 });
+
+// --- Video Analysis ---
+app.post('/api/creative/analyze-video', requireAdmin, upload.single('video'), async (req, res) => {
+  const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+  if (!ANTHROPIC_API_KEY) return res.status(400).json({ error: 'ANTHROPIC_API_KEY not set in environment variables.' });
+
+  const url = (req.body?.url || '').trim();
+  const file = req.file;
+
+  if (!url && !file) return res.status(400).json({ error: 'Provide a YouTube URL or upload an MP4 file.' });
+
+  try {
+    const msgContent = [];
+    let contextNote = '';
+
+    if (file) {
+      const frames = await extractVideoFrames(file.path);
+      for (const fp of frames) {
+        try {
+          const data = fs.readFileSync(fp);
+          msgContent.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: data.toString('base64') } });
+          fs.unlinkSync(fp);
+        } catch(e) {}
+      }
+      try { fs.unlinkSync(file.path); } catch(e) {}
+      contextNote = `Uploaded video: ${file.originalname || 'video.mp4'} — ${frames.length} frames extracted`;
+    } else {
+      const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+      if (ytMatch) {
+        const vid = ytMatch[1];
+        try {
+          const oe = await fetch(`https://www.youtube.com/oembed?url=https://youtube.com/watch?v=${vid}&format=json`);
+          if (oe.ok) { const d = await oe.json(); contextNote = `YouTube: "${d.title}" by ${d.author_name}`; }
+        } catch(e) {}
+        for (const thumbUrl of [`https://img.youtube.com/vi/${vid}/maxresdefault.jpg`, `https://img.youtube.com/vi/${vid}/hqdefault.jpg`]) {
+          try {
+            const r = await fetch(thumbUrl);
+            if (r.ok) {
+              const buf = Buffer.from(await r.arrayBuffer());
+              msgContent.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: buf.toString('base64') } });
+              break;
+            }
+          } catch(e) {}
+        }
+        if (!contextNote) contextNote = `YouTube URL: ${url}`;
+      } else {
+        contextNote = `Video URL: ${url}`;
+      }
+    }
+
+    msgContent.push({ type: 'text', text: `You are an expert creative strategist for kids educational apps (Kiddopia, ABCmouse, Khan Academy Kids, Cocomelon).
+
+${contextNote ? `Context: ${contextNote}` : ''}
+
+Analyze this ad creative and give a detailed breakdown. Format your response exactly like this:
+
+🎯 HOOK (0–3s)
+[What grabs attention immediately — question, shock, emotion, visual]
+
+😰 PROBLEM SETUP
+[What parent/child pain point is addressed and how relatable it is]
+
+✨ SOLUTION REVEAL
+[How the product is presented and what features are highlighted]
+
+💡 WHY IT WORKS
+[Core psychological reason — FOMO, social proof, urgency, aspiration]
+
+🎨 VISUAL STRATEGY
+[Colors, characters, pacing, animation style, text overlays]
+
+📣 CTA STRENGTH
+[How effective is the call to action — rate and explain]
+
+🔁 WHAT TO REPLICATE
+[3 specific elements to copy for your own kids app creatives]
+
+✍️ BRIEF FOR A SIMILAR CREATIVE
+[A 2-sentence brief you could hand to a creator right now]
+
+Be specific, actionable, and focused on what converts for parents of children aged 2–8.` });
+
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 1500, messages: [{ role: 'user', content: msgContent }] })
+    });
+    const data = await r.json();
+    if (data.error) return res.status(500).json({ error: data.error.message });
+    res.json({ analysis: data.content[0].text, context: contextNote });
+  } catch(e) {
+    if (req.file) try { fs.unlinkSync(req.file.path); } catch(ee) {}
+    res.status(500).json({ error: e.message });
+  }
+});
+
+function extractVideoFrames(videoPath) {
+  return new Promise(resolve => {
+    const ts = Date.now();
+    const outPattern = path.join(os.tmpdir(), `vf_${ts}_%02d.jpg`);
+    exec(`ffprobe -v quiet -show_entries format=duration -of csv=p=0 "${videoPath}" 2>/dev/null`, (err, stdout) => {
+      const duration = parseFloat(stdout?.trim()) || 30;
+      const fps = 6 / duration;
+      exec(`ffmpeg -i "${videoPath}" -vf "fps=${fps},scale=640:-1" -frames:v 6 -q:v 4 "${outPattern}" -y 2>/dev/null`, () => {
+        const frames = [];
+        for (let i = 1; i <= 6; i++) {
+          const p = path.join(os.tmpdir(), `vf_${ts}_${String(i).padStart(2,'0')}.jpg`);
+          if (fs.existsSync(p)) frames.push(p);
+        }
+        resolve(frames);
+      });
+    });
+  });
+}
 
 app.use(express.static(path.join(__dirname, 'public')));
 

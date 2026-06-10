@@ -154,6 +154,15 @@ button.ok{background:#166534;color:var(--ok);border:1px solid #166534}
 .api-notice{background:#1a1206;border:1px solid #4a3010;border-radius:10px;padding:14px 16px;font-size:13px;color:var(--warn);margin-bottom:16px}
 .api-notice a{color:var(--warn)}
 
+/* video analysis */
+.video-drop{border:2px dashed var(--line2);border-radius:10px;padding:20px;text-align:center;cursor:pointer;color:var(--faint);font-size:13px;transition:border-color .15s;position:relative}
+.video-drop:hover,.video-drop.dragover{border-color:var(--accent);color:var(--muted)}
+.video-drop.has-file{border-color:var(--ok);color:var(--ok)}
+.analysis-out{background:var(--panel2);border:1px solid var(--line2);border-radius:10px;padding:18px;font-size:13px;line-height:1.8;white-space:pre-wrap;color:var(--text);margin-top:12px}
+.analysis-out .section{margin-bottom:14px}
+.divider-or{display:flex;align-items:center;gap:12px;color:var(--faint);font-size:11px;margin:10px 0}
+.divider-or::before,.divider-or::after{content:'';flex:1;height:1px;background:var(--line2)}
+
 /* ad cards */
 .ad-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-top:16px}
 .ad-card{background:var(--panel2);border:1px solid var(--line2);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
@@ -199,6 +208,7 @@ button.ok{background:#166534;color:var(--ok);border:1px solid #166534}
   <div class="sidebar-section">Studio</div>
   <div class="nav-sub active" data-tab="pipeline">Pipeline</div>
   <div class="nav-sub" data-tab="research">Research</div>
+  <div class="nav-sub" data-tab="video">Video Analysis</div>
   <div class="nav-sub" data-tab="competitors">Competitors</div>
 
   <div class="sidebar-bottom">
@@ -273,6 +283,44 @@ button.ok{background:#166534;color:var(--ok);border:1px solid #166534}
 
       <p class="eyebrow">Saved observations</p>
       <div class="cards" id="researchList"></div>
+    </div>
+
+    <!-- VIDEO ANALYSIS TAB -->
+    <div class="tab-panel hide" id="tab-video">
+      <div class="form">
+        <h3>🎬 Video Analysis</h3>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:18px">Paste a YouTube link or upload an MP4 — get a full AI breakdown of why the ad works and what to replicate.</p>
+
+        <label class="fld"><span class="k">YouTube / Video URL</span>
+          <input id="va_url" type="url" placeholder="https://youtube.com/watch?v=…"/>
+        </label>
+
+        <div class="divider-or">or upload MP4</div>
+
+        <label class="fld"><span class="k">MP4 File <em>— max 100 MB</em></span>
+          <div class="video-drop" id="videoDrop" onclick="document.getElementById('va_file').click()">
+            <input type="file" id="va_file" accept="video/mp4,video/*" style="display:none"/>
+            <span id="vaDropLabel">Click to select file · or drag &amp; drop</span>
+          </div>
+        </label>
+
+        <div class="actions" style="margin-top:14px">
+          <button id="analyzeBtn">✦ Analyze</button>
+          <span class="msg" id="vaMsg"></span>
+        </div>
+      </div>
+
+      <div id="vaResultWrap" class="hide">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+          <p class="eyebrow" style="margin:0">Analysis</p>
+          <div style="display:flex;gap:8px">
+            <button class="ok sm" id="vaSaveBtn">+ Save to Research</button>
+            <button class="ghost sm" id="vaClearBtn">Clear</button>
+          </div>
+        </div>
+        <div id="vaContext" style="font-size:12px;color:var(--accent);font-family:var(--mono);margin-bottom:10px"></div>
+        <div class="analysis-out" id="vaResult"></div>
+      </div>
     </div>
 
     <!-- COMPETITORS TAB -->
@@ -659,6 +707,110 @@ function timeAgo(ts){
   if(d<86400000)return Math.floor(d/3600000)+'h ago';
   return Math.floor(d/86400000)+'d ago';
 }
+
+// ===== VIDEO ANALYSIS =====
+let vaSelectedFile = null;
+let vaLastAnalysis = '';
+let vaLastContext = '';
+
+const vaFileinput = document.getElementById('va_file');
+const vaDrop = document.getElementById('videoDrop');
+const vaDropLabel = document.getElementById('vaDropLabel');
+
+vaFileinput.onchange = () => {
+  vaSelectedFile = vaFileinput.files[0] || null;
+  if (vaSelectedFile) {
+    const mb = (vaSelectedFile.size / 1024 / 1024).toFixed(1);
+    vaDropLabel.textContent = `✓ ${vaSelectedFile.name}  (${mb} MB)`;
+    vaDrop.classList.add('has-file');
+    $('#va_url').value = '';
+  }
+};
+
+vaDrop.addEventListener('dragover', e => { e.preventDefault(); vaDrop.classList.add('dragover'); });
+vaDrop.addEventListener('dragleave', () => vaDrop.classList.remove('dragover'));
+vaDrop.addEventListener('drop', e => {
+  e.preventDefault(); vaDrop.classList.remove('dragover');
+  const f = e.dataTransfer?.files?.[0];
+  if (f && f.type.startsWith('video/')) {
+    vaSelectedFile = f;
+    const mb = (f.size / 1024 / 1024).toFixed(1);
+    vaDropLabel.textContent = `✓ ${f.name}  (${mb} MB)`;
+    vaDrop.classList.add('has-file');
+    $('#va_url').value = '';
+  }
+});
+
+$('#analyzeBtn').onclick = async () => {
+  const url = ($('#va_url').value || '').trim();
+  if (!url && !vaSelectedFile) {
+    alert('Paste a YouTube URL or upload an MP4 file first.'); return;
+  }
+  const btn = $('#analyzeBtn');
+  btn.disabled = true; btn.textContent = '✦ Analyzing…';
+  $('#vaResultWrap').classList.add('hide');
+
+  try {
+    let response;
+    if (vaSelectedFile) {
+      const fd = new FormData();
+      fd.append('video', vaSelectedFile);
+      const r = await fetch('/api/creative/analyze-video', {
+        method: 'POST', headers: { 'Authorization': 'Bearer ' + TOKEN }, body: fd
+      });
+      response = await r.json();
+    } else {
+      const r = await fetch('/api/creative/analyze-video', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + TOKEN, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url })
+      });
+      response = await r.json();
+    }
+    if (response.error) {
+      alert('Error: ' + response.error); return;
+    }
+    vaLastAnalysis = response.analysis;
+    vaLastContext = response.context || '';
+    $('#vaContext').textContent = vaLastContext;
+    $('#vaResult').textContent = vaLastAnalysis;
+    $('#vaResultWrap').classList.remove('hide');
+  } catch(e) {
+    alert('Error: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = '✦ Analyze';
+  }
+};
+
+$('#vaClearBtn').onclick = () => {
+  $('#va_url').value = '';
+  vaSelectedFile = null;
+  vaDropLabel.textContent = 'Click to select file · or drag & drop';
+  vaDrop.classList.remove('has-file');
+  vaFileinput.value = '';
+  $('#vaResultWrap').classList.add('hide');
+};
+
+$('#vaSaveBtn').onclick = async () => {
+  if (!vaLastAnalysis) return;
+  const url = ($('#va_url').value || '').trim();
+  const title = vaLastContext ? vaLastContext.replace(/^YouTube: "(.+)" by .+$/, '$1').slice(0, 80) : (vaSelectedFile?.name || 'Video Analysis');
+  await api('/api/creative/research', { method: 'POST', body: JSON.stringify({
+    title,
+    content: vaLastAnalysis,
+    competitor: '',
+    hook: '',
+    format: 'Video Analysis',
+    headline: '',
+    caption: '',
+    cta: '',
+    platform: url.includes('youtube') ? 'YouTube' : 'Video',
+  })});
+  const btn = $('#vaSaveBtn');
+  btn.textContent = '✓ Saved!'; btn.disabled = true;
+  setTimeout(() => { btn.textContent = '+ Save to Research'; btn.disabled = false; }, 2500);
+  loadResearch();
+};
 
 async function loadAll(){
   await Promise.all([loadKanban(),loadResearch(),loadCompetitors()]);
