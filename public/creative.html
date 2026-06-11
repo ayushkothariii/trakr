@@ -154,6 +154,22 @@ button.ok{background:#166534;color:var(--ok);border:1px solid #166534}
 .api-notice{background:#1a1206;border:1px solid #4a3010;border-radius:10px;padding:14px 16px;font-size:13px;color:var(--warn);margin-bottom:16px}
 .api-notice a{color:var(--warn)}
 
+/* storyboard */
+.sb-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:4px}
+@media(max-width:960px){.sb-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.sb-grid{grid-template-columns:1fr}}
+.sb-panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;transition:border-color .15s}
+.sb-panel:hover{border-color:var(--line2)}
+.sb-img{width:100%;aspect-ratio:16/9;object-fit:cover;display:block;background:var(--panel2)}
+.sb-img-ph{width:100%;aspect-ratio:16/9;background:var(--panel2);display:flex;align-items:center;justify-content:center;color:var(--faint);font-size:12px;font-family:var(--mono)}
+.sb-body{padding:14px}
+.sb-meta{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.sb-timing{font-family:var(--mono);font-size:10px;color:var(--accent);text-transform:uppercase;letter-spacing:.08em}
+.sb-num{font-family:var(--mono);font-size:10px;color:var(--faint)}
+.sb-label{font-weight:700;font-size:13px;margin-bottom:6px}
+.sb-desc{font-size:12px;color:var(--muted);line-height:1.55;margin-bottom:10px}
+.sb-vo{font-size:12px;color:var(--ok);font-style:italic;line-height:1.5;padding:8px 10px;background:var(--panel2);border-radius:6px;border-left:2px solid var(--ok)}
+
 /* video analysis */
 .video-drop{border:2px dashed var(--line2);border-radius:10px;padding:20px;text-align:center;cursor:pointer;color:var(--faint);font-size:13px;transition:border-color .15s;position:relative}
 .video-drop:hover,.video-drop.dragover{border-color:var(--accent);color:var(--muted)}
@@ -209,6 +225,7 @@ button.ok{background:#166534;color:var(--ok);border:1px solid #166534}
   <div class="nav-sub active" data-tab="pipeline">Pipeline</div>
   <div class="nav-sub" data-tab="research">Research</div>
   <div class="nav-sub" data-tab="video">Video Analysis</div>
+  <div class="nav-sub" data-tab="storyboard">Storyboard</div>
   <div class="nav-sub" data-tab="competitors">Competitors</div>
 
   <div class="sidebar-bottom">
@@ -283,6 +300,32 @@ button.ok{background:#166534;color:var(--ok);border:1px solid #166534}
 
       <p class="eyebrow">Saved observations</p>
       <div class="cards" id="researchList"></div>
+    </div>
+
+    <!-- STORYBOARD TAB -->
+    <div class="tab-panel hide" id="tab-storyboard">
+      <div class="form">
+        <h3>✦ Storyboard Generator</h3>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:18px">Describe your video concept. Claude breaks it into 6 scenes, Grok draws each one — aligned with your saved Research trends.</p>
+        <label class="fld"><span class="k">Brief</span>
+          <textarea id="sb_brief" rows="4" placeholder="e.g. A worried mom sees her 4-year-old struggling with letters. She finds our app, tries it for 2 weeks, and the child is now confidently reading. End with happy family moment and app download CTA."></textarea>
+        </label>
+        <div class="actions">
+          <button id="sbGenBtn">✦ Generate Storyboard</button>
+          <span id="sbHint" style="font-size:12px;color:var(--faint)">~20 sec · Claude + Grok · uses your Research</span>
+        </div>
+      </div>
+
+      <div id="sbOutput" class="hide">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+          <p class="eyebrow" style="margin:0">Generated storyboard</p>
+          <div style="display:flex;gap:8px">
+            <button class="ok sm" id="sbSaveScript">+ Save as Script</button>
+            <button class="ghost sm" id="sbClear">Clear</button>
+          </div>
+        </div>
+        <div class="sb-grid" id="sbGrid"></div>
+      </div>
     </div>
 
     <!-- VIDEO ANALYSIS TAB -->
@@ -707,6 +750,85 @@ function timeAgo(ts){
   if(d<86400000)return Math.floor(d/3600000)+'h ago';
   return Math.floor(d/86400000)+'d ago';
 }
+
+// ===== STORYBOARD =====
+let sbPanels = [];
+
+$('#sbGenBtn').onclick = async () => {
+  const brief = $('#sb_brief').value.trim();
+  if (!brief) { alert('Write a brief first.'); return; }
+
+  const btn = $('#sbGenBtn');
+  btn.disabled = true; btn.textContent = '✦ Generating…';
+  $('#sbHint').textContent = 'Claude is writing scenes · Grok is drawing · ~20–30 seconds…';
+  $('#sbOutput').classList.add('hide');
+
+  try {
+    const r = await fetch('/api/creative/storyboard', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + TOKEN, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brief })
+    });
+    const data = await r.json();
+    if (data.error) { alert('Error: ' + data.error); return; }
+
+    sbPanels = data.panels || [];
+    renderStoryboard(sbPanels);
+    $('#sbOutput').classList.remove('hide');
+  } catch(e) {
+    alert('Error: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = '✦ Generate Storyboard';
+    $('#sbHint').textContent = '~20 sec · Claude + Grok · uses your Research';
+  }
+};
+
+function renderStoryboard(panels) {
+  const grid = $('#sbGrid');
+  grid.innerHTML = '';
+  panels.forEach(p => {
+    const el = document.createElement('div');
+    el.className = 'sb-panel';
+    el.innerHTML = `
+      ${p.image_url
+        ? `<img class="sb-img" src="${esc(p.image_url)}" alt="Scene ${p.scene}" loading="lazy"/>`
+        : `<div class="sb-img-ph">Scene ${p.scene}${p.image_error ? ' · ' + esc(p.image_error) : ' · no image generated'}</div>`
+      }
+      <div class="sb-body">
+        <div class="sb-meta">
+          <span class="sb-num">Scene ${p.scene}</span>
+          <span class="sb-timing">${esc(p.timing)}</span>
+          <span class="badge research" style="margin-left:auto">${esc(p.label)}</span>
+        </div>
+        <div class="sb-label">${esc(p.scene_description)}</div>
+        <div class="sb-vo">"${esc(p.voiceover)}"</div>
+      </div>`;
+    grid.appendChild(el);
+  });
+}
+
+$('#sbSaveScript').onclick = async () => {
+  if (!sbPanels.length) return;
+  const brief = $('#sb_brief').value.trim();
+  const script = sbPanels.map(p =>
+    `${p.label.toUpperCase()} (${p.timing})\n[Scene] ${p.scene_description}\n[VO] "${p.voiceover}"`
+  ).join('\n\n');
+  await api('/api/creative/scripts', { method: 'POST', body: JSON.stringify({
+    title: brief.slice(0, 60) + (brief.length > 60 ? '…' : ''),
+    brief, script, status: 'script', platform: 'All', notes: 'AI storyboard'
+  })});
+  const btn = $('#sbSaveScript');
+  btn.textContent = '✓ Saved to Pipeline'; btn.disabled = true;
+  setTimeout(() => { btn.textContent = '+ Save as Script'; btn.disabled = false; }, 2500);
+  loadKanban();
+};
+
+$('#sbClear').onclick = () => {
+  sbPanels = [];
+  $('#sbGrid').innerHTML = '';
+  $('#sbOutput').classList.add('hide');
+  $('#sb_brief').value = '';
+};
 
 // ===== VIDEO ANALYSIS =====
 let vaSelectedFile = null;

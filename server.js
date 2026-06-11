@@ -335,6 +335,93 @@ CAPTION: [social media caption with emojis]`;
   }
 });
 
+// --- Storyboard Generation ---
+app.post('/api/creative/storyboard', requireAdmin, async (req, res) => {
+  const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+  const XAI_API_KEY = process.env.XAI_API_KEY;
+  if (!ANTHROPIC_API_KEY) return res.status(400).json({ error: 'ANTHROPIC_API_KEY not set.' });
+  if (!XAI_API_KEY) return res.status(400).json({ error: 'XAI_API_KEY not set. Add it to your Render environment variables.' });
+
+  const { brief } = req.body;
+  if (!brief) return res.status(400).json({ error: 'brief required' });
+
+  // Pull recent research for trend context
+  const researchResult = await db.execute('SELECT * FROM creative_research ORDER BY created_at DESC LIMIT 10');
+  const researchContext = researchResult.rows.map(r => [
+    r.title,
+    r.hook     ? `Hook: ${r.hook}` : '',
+    r.headline ? `Headline: ${r.headline}` : '',
+    r.content  ? `Insight: ${r.content}` : '',
+  ].filter(Boolean).join(' | ')).join('\n');
+
+  try {
+    // Step 1: Claude generates 6 scene descriptions + image prompts
+    const claudePrompt = `You are a storyboard director specialising in kids educational app video ads (Kiddopia, ABCmouse, Cocomelon, Khan Academy Kids).
+
+Brief: ${brief}
+${researchContext ? `\nCompetitor research & trends:\n${researchContext}` : ''}
+
+Generate a 6-panel storyboard for a 30-second animated video ad that reflects the trends above.
+Return ONLY a valid JSON array — no markdown, no explanation.
+
+[
+  {
+    "scene": 1,
+    "timing": "0-3s",
+    "label": "Hook",
+    "voiceover": "...",
+    "scene_description": "What the animator sees — characters, action, setting, mood",
+    "image_prompt": "Bright colorful 2D kids animation, [specific scene details], cheerful warm palette, Cocomelon art style, storyboard frame, NO text or letters visible in image"
+  }
+]
+
+Labels in order: Hook, Problem, Solution, Feature Demo, Social Proof, CTA
+Make image_prompts highly visual and scene-specific. Always end with: cheerful warm palette, Cocomelon art style, storyboard frame, NO text in image.`;
+
+    const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 2500, messages: [{ role: 'user', content: claudePrompt }] })
+    });
+    const claudeData = await claudeRes.json();
+    if (claudeData.error) return res.status(500).json({ error: 'Claude: ' + claudeData.error.message });
+
+    let scenes;
+    try {
+      const text = claudeData.content[0].text.trim();
+      const match = text.match(/\[[\s\S]*\]/);
+      scenes = JSON.parse(match ? match[0] : text);
+    } catch(e) {
+      return res.status(500).json({ error: 'Could not parse scene list. Try again.' });
+    }
+
+    // Step 2: Generate images with Grok in parallel (with per-image timeout)
+    const imagePromises = scenes.map(async (scene) => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 30000);
+      try {
+        const r = await fetch('https://api.x.ai/v1/images/generations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${XAI_API_KEY}` },
+          body: JSON.stringify({ model: 'grok-2-image-1212', prompt: scene.image_prompt, n: 1, response_format: 'url' }),
+          signal: controller.signal
+        });
+        const d = await r.json();
+        clearTimeout(timer);
+        return { ...scene, image_url: d.data?.[0]?.url || null, image_error: d.error?.message || null };
+      } catch(e) {
+        clearTimeout(timer);
+        return { ...scene, image_url: null, image_error: e.name === 'AbortError' ? 'timeout' : e.message };
+      }
+    });
+
+    const panels = await Promise.all(imagePromises);
+    res.json({ panels });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // --- Video Analysis ---
 app.post('/api/creative/analyze-video', requireAdmin, upload.single('video'), async (req, res) => {
   const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
