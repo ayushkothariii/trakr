@@ -174,17 +174,19 @@ app.post('/api/attribute/ios', async (req, res) => {
 
 // ---------- 4. ADMIN: links CRUD ----------
 app.get('/api/links', requireAdmin, async (req, res) => {
-  const result = await db.execute(`
-    SELECT l.*,
+  const game = req.query.game || 'tmkoc';
+  const result = await db.execute({
+    sql: `SELECT l.*,
       (SELECT COUNT(*) FROM clicks   c WHERE c.alias = l.alias) AS clicks,
       (SELECT COUNT(*) FROM installs i WHERE i.alias = l.alias) AS installs
-    FROM links l ORDER BY l.created_at DESC
-  `);
+    FROM links l WHERE l.game = ? ORDER BY l.created_at DESC`,
+    args: [game]
+  });
   res.json(result.rows);
 });
 
 app.post('/api/links', requireAdmin, async (req, res) => {
-  let { alias, label, android_package, ios_appstore_id, desktop_url, deep_link_path } = req.body;
+  let { alias, label, android_package, ios_appstore_id, desktop_url, deep_link_path, game = 'tmkoc' } = req.body;
   alias = (alias || '').trim() || crypto.randomBytes(4).toString('hex');
   if (!/^[a-zA-Z0-9_-]+$/.test(alias))
     return res.status(400).json({ error: 'alias may only contain letters, numbers, - and _' });
@@ -194,8 +196,8 @@ app.post('/api/links', requireAdmin, async (req, res) => {
     return res.status(409).json({ error: 'alias already exists' });
 
   await db.execute({
-    sql: `INSERT INTO links (alias, label, android_package, ios_appstore_id, desktop_url, deep_link_path, created_at)
-          VALUES (?,?,?,?,?,?,?)`,
+    sql: `INSERT INTO links (alias, label, android_package, ios_appstore_id, desktop_url, deep_link_path, game, created_at)
+          VALUES (?,?,?,?,?,?,?,?)`,
     args: [
       alias,
       label || '',
@@ -203,6 +205,7 @@ app.post('/api/links', requireAdmin, async (req, res) => {
       (ios_appstore_id || '').replace(/[^0-9]/g, ''),
       desktop_url || '',
       deep_link_path || '',
+      game,
       Date.now()
     ]
   });

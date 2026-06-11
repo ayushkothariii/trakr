@@ -37,6 +37,14 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15
 .nav-item .icon{font-size:15px;width:20px;text-align:center;flex:none}
 .nav-item .badge{margin-left:auto;font-family:var(--mono);font-size:10px;background:var(--line2);color:var(--muted);padding:1px 6px;border-radius:8px}
 
+/* game switcher */
+.game-switcher{padding:10px 10px;border-bottom:1px solid var(--line)}
+.game-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--faint);padding:0 2px 4px}
+.game-pill-group{display:flex;gap:3px;background:var(--panel2);border-radius:8px;padding:3px;border:1px solid var(--line2)}
+.game-pill{flex:1;padding:6px 8px;border-radius:6px;font-size:11px;font-weight:700;background:transparent;border:0;color:var(--muted);cursor:pointer;transition:all .15s;font-family:var(--sans)}
+.game-pill:hover{color:var(--text)}
+.game-pill.active{background:var(--clicks);color:#040d14}
+
 .sidebar-bottom{margin-top:auto;padding:14px 10px;border-top:1px solid var(--line)}
 .sidebar-user{font-size:12px;color:var(--muted);padding:8px 12px;display:flex;align-items:center;gap:8px}
 .sidebar-user .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);flex:none}
@@ -136,6 +144,14 @@ label.fld .k em{color:var(--faint);text-transform:none;letter-spacing:0;font-sty
     <div class="sub">install attribution</div>
   </div>
 
+  <div class="game-switcher">
+    <div class="game-label">Active Game</div>
+    <div class="game-pill-group">
+      <button class="game-pill active" data-game="tmkoc">🎓 TMKOC</button>
+      <button class="game-pill" data-game="gada">🛒 Gada</button>
+    </div>
+  </div>
+
   <div class="sidebar-section">Analytics</div>
   <a class="nav-item active" href="/"><span class="icon">🔗</span> Attribution</a>
   <a class="nav-item" href="/creative.html"><span class="icon">✦</span> Creative Studio</a>
@@ -186,6 +202,20 @@ label.fld .k em{color:var(--faint);text-transform:none;letter-spacing:0;font-sty
 <script>
 const $=s=>document.querySelector(s);
 let TOKEN=localStorage.getItem('trackr_token')||'';
+let currentGame=localStorage.getItem('trackr_game')||'tmkoc';
+const GAME_NAMES={tmkoc:'TMKOC Playschool',gada:'Gada Electronics'};
+
+function applyGame(game){
+  currentGame=game;
+  localStorage.setItem('trackr_game',game);
+  document.querySelectorAll('.game-pill').forEach(p=>p.classList.toggle('active',p.dataset.game===game));
+  $('#app').querySelector('.page-header h2').textContent='Attribution';
+  $('#app').querySelector('.page-header p').textContent='Tracking links for '+GAME_NAMES[game];
+  load();
+}
+document.querySelectorAll('.game-pill').forEach(p=>{
+  p.onclick=()=>{ if(p.dataset.game!==currentGame) applyGame(p.dataset.game); };
+});
 
 async function api(path,opts={}){
   const r=await fetch(path,{...opts,headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json',...(opts.headers||{})}});
@@ -202,7 +232,7 @@ function showApp(){
   $('#gate').classList.add('hide');
   $('#sidebar').classList.remove('hide');$('#app').classList.remove('hide');
   $('#origin').textContent=location.hostname;
-  load();
+  applyGame(currentGame);
 }
 $('#enter').onclick=tryToken;
 $('#token').addEventListener('keydown',e=>{if(e.key==='Enter')tryToken();});
@@ -215,7 +245,7 @@ $('#logout').onclick=()=>{localStorage.removeItem('trackr_token');TOKEN='';$('#t
 
 $('#create').onclick=async()=>{
   $('#formErr').textContent='';
-  const body={alias:$('#f_alias').value,label:$('#f_label').value,android_package:$('#f_pkg').value,ios_appstore_id:$('#f_ios').value,deep_link_path:$('#f_deep').value,desktop_url:$('#f_desk').value};
+  const body={alias:$('#f_alias').value,label:$('#f_label').value,android_package:$('#f_pkg').value,ios_appstore_id:$('#f_ios').value,deep_link_path:$('#f_deep').value,desktop_url:$('#f_desk').value,game:currentGame};
   const r=await api('/api/links',{method:'POST',body:JSON.stringify(body)});
   if(r.error){$('#formErr').textContent=r.error;return;}
   const born=$('#born');
@@ -228,7 +258,7 @@ $('#create').onclick=async()=>{
 function pct(i,c){return c?Math.round(i/c*100):0;}
 async function load(){
   let links;
-  try{links=await api('/api/links');}catch(e){return showGate('Session expired.');}
+  try{links=await api('/api/links?game='+currentGame);}catch(e){return showGate('Session expired.');}
   // total stats
   const totC=links.reduce((a,l)=>a+Number(l.clicks),0);
   const totI=links.reduce((a,l)=>a+Number(l.installs),0);

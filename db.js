@@ -85,6 +85,7 @@ async function initDb() {
     ['creative_research',    'game',     'TEXT DEFAULT "tmkoc"'],
     ['creative_competitors', 'game',     'TEXT DEFAULT "tmkoc"'],
     ['creative_scripts',     'game',     'TEXT DEFAULT "tmkoc"'],
+    ['links',                'game',     'TEXT DEFAULT "tmkoc"'],
   ];
   for (const [table, col, def] of newCols) {
     try { await db.execute(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`); } catch(e) {}
