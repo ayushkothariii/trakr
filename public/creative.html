@@ -792,7 +792,7 @@ function renderStoryboard(panels) {
     el.innerHTML = `
       ${p.image_url
         ? `<img class="sb-img" src="${esc(p.image_url)}" alt="Scene ${p.scene}" loading="lazy"/>`
-        : `<div class="sb-img-ph">Scene ${p.scene}${p.image_error ? ' · ' + esc(p.image_error) : ' · no image generated'}</div>`
+        : `<div class="sb-img-ph" style="flex-direction:column;gap:6px;padding:12px;text-align:center"><span>Scene ${p.scene}</span>${p.image_error ? `<span style="font-size:10px;color:var(--danger);word-break:break-all">${esc(p.image_error.slice(0,120))}</span>` : ''}</div>`
       }
       <div class="sb-body">
         <div class="sb-meta">
