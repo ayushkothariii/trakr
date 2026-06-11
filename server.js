@@ -335,6 +335,72 @@ CAPTION: [social media caption with emojis]`;
   }
 });
 
+// --- Caption Suggestions ---
+app.post('/api/creative/captions', requireAdmin, async (req, res) => {
+  const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+  if (!ANTHROPIC_API_KEY) return res.status(400).json({ error: 'ANTHROPIC_API_KEY not set.' });
+
+  const { brief, platform, tone } = req.body;
+  if (!brief) return res.status(400).json({ error: 'brief required' });
+
+  // Pull research for context
+  const researchResult = await db.execute('SELECT * FROM creative_research ORDER BY created_at DESC LIMIT 8');
+  const researchContext = researchResult.rows.map(r => [
+    r.title,
+    r.caption  ? `Caption: ${r.caption}` : '',
+    r.hook     ? `Hook: ${r.hook}` : '',
+    r.cta      ? `CTA: ${r.cta}` : '',
+  ].filter(Boolean).join(' | ')).join('\n');
+
+  const prompt = `You are an expert social media copywriter for kids educational apps (Kiddopia, ABCmouse, Cocomelon style). Write captions for parents of children aged 2–8.
+
+Brief: ${brief}
+Platform: ${platform || 'All platforms'}
+Tone: ${tone || 'Warm and engaging'}
+${researchContext ? `\nCompetitor caption insights:\n${researchContext}` : ''}
+
+Generate 6 caption variations, each with a different angle. Return ONLY a valid JSON array — no markdown, no explanation.
+
+[
+  {
+    "angle": "Hook",
+    "caption": "...",
+    "note": "one sentence on why this angle works"
+  }
+]
+
+Angles in order: Hook, Problem-aware, Social Proof, Emotional, Trendy/UGC, CTA-heavy
+
+Rules:
+- Each caption must be ready to paste — no placeholders
+- Include relevant emojis
+- End each with a CTA line
+- Keep under 150 words each
+- Match the platform style (TikTok = casual, Meta = slightly more formal, etc.)`;
+
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 2500, messages: [{ role: 'user', content: prompt }] })
+    });
+    const data = await r.json();
+    if (data.error) return res.status(500).json({ error: data.error.message });
+
+    let captions;
+    try {
+      const text = data.content[0].text.trim();
+      const match = text.match(/\[[\s\S]*\]/);
+      captions = JSON.parse(match ? match[0] : text);
+    } catch(e) {
+      return res.status(500).json({ error: 'Could not parse captions. Try again.' });
+    }
+    res.json({ captions });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // --- Storyboard Generation ---
 app.post('/api/creative/storyboard', requireAdmin, async (req, res) => {
   const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;

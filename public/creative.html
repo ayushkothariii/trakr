@@ -154,6 +154,17 @@ button.ok{background:#166534;color:var(--ok);border:1px solid #166534}
 .api-notice{background:#1a1206;border:1px solid #4a3010;border-radius:10px;padding:14px 16px;font-size:13px;color:var(--warn);margin-bottom:16px}
 .api-notice a{color:var(--warn)}
 
+/* captions */
+.cap-grid{display:flex;flex-direction:column;gap:12px;margin-top:4px}
+.cap-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+.cap-card-top{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.cap-angle{font-weight:700;font-size:13px;flex:1}
+.cap-copy-btn{font-family:var(--mono);font-size:11px;padding:4px 10px;border-radius:6px;background:var(--panel2);border:1px solid var(--line2);color:var(--muted);cursor:pointer;transition:all .15s;flex:none}
+.cap-copy-btn:hover{color:var(--text);border-color:var(--faint)}
+.cap-copy-btn.copied{color:var(--ok);border-color:var(--ok)}
+.cap-text{font-size:13px;color:var(--text);line-height:1.7;white-space:pre-wrap;margin-bottom:10px}
+.cap-note{font-size:11px;color:var(--faint);font-style:italic;padding-top:8px;border-top:1px solid var(--line2)}
+
 /* storyboard */
 .sb-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:4px}
 @media(max-width:960px){.sb-grid{grid-template-columns:repeat(2,1fr)}}
@@ -226,6 +237,7 @@ button.ok{background:#166534;color:var(--ok);border:1px solid #166534}
   <div class="nav-sub" data-tab="research">Research</div>
   <div class="nav-sub" data-tab="video">Video Analysis</div>
   <div class="nav-sub" data-tab="storyboard">Storyboard</div>
+  <div class="nav-sub" data-tab="captions">Captions</div>
   <div class="nav-sub" data-tab="competitors">Competitors</div>
 
   <div class="sidebar-bottom">
@@ -300,6 +312,51 @@ button.ok{background:#166534;color:var(--ok);border:1px solid #166534}
 
       <p class="eyebrow">Saved observations</p>
       <div class="cards" id="researchList"></div>
+    </div>
+
+    <!-- CAPTIONS TAB -->
+    <div class="tab-panel hide" id="tab-captions">
+      <div class="form">
+        <h3>✦ Caption Suggestions</h3>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:18px">Describe your video or ad. Get 6 ready-to-paste captions across different angles — aligned with your Research trends.</p>
+        <label class="fld"><span class="k">Brief / What the ad is about</span>
+          <textarea id="cap_brief" rows="3" placeholder="e.g. A parent discovers their child can now read full sentences after 30 days of using our app. Transformation story with happy ending."></textarea>
+        </label>
+        <div class="grid2">
+          <label class="fld"><span class="k">Platform</span>
+            <select id="cap_platform">
+              <option value="All platforms">All platforms</option>
+              <option value="Meta Feed">Meta Feed</option>
+              <option value="Meta Reels">Meta Reels</option>
+              <option value="Instagram Story">Instagram Story</option>
+              <option value="TikTok">TikTok</option>
+              <option value="YouTube">YouTube</option>
+            </select>
+          </label>
+          <label class="fld"><span class="k">Tone</span>
+            <select id="cap_tone">
+              <option value="Warm and engaging">Warm &amp; engaging</option>
+              <option value="Fun and playful">Fun &amp; playful</option>
+              <option value="Urgency and FOMO">Urgency &amp; FOMO</option>
+              <option value="Emotional and heartfelt">Emotional &amp; heartfelt</option>
+              <option value="Educational and informative">Educational</option>
+              <option value="Casual UGC style">Casual / UGC</option>
+            </select>
+          </label>
+        </div>
+        <div class="actions">
+          <button id="capGenBtn">✦ Generate Captions</button>
+          <span id="capHint" style="font-size:12px;color:var(--faint)">~5 seconds · uses your Research</span>
+        </div>
+      </div>
+
+      <div id="capOutput" class="hide">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+          <p class="eyebrow" style="margin:0">6 caption variations</p>
+          <button class="ghost sm" id="capClear">Clear</button>
+        </div>
+        <div class="cap-grid" id="capGrid"></div>
+      </div>
     </div>
 
     <!-- STORYBOARD TAB -->
@@ -750,6 +807,74 @@ function timeAgo(ts){
   if(d<86400000)return Math.floor(d/3600000)+'h ago';
   return Math.floor(d/86400000)+'d ago';
 }
+
+// ===== CAPTIONS =====
+const ANGLE_COLORS = {
+  'Hook':          'var(--accent)',
+  'Problem-aware': 'var(--warn)',
+  'Social Proof':  'var(--ok)',
+  'Emotional':     '#F472B6',
+  'Trendy/UGC':    'var(--clicks)',
+  'CTA-heavy':     'var(--installs)',
+};
+
+$('#capGenBtn').onclick = async () => {
+  const brief = $('#cap_brief').value.trim();
+  if (!brief) { alert('Write a brief first.'); return; }
+
+  const btn = $('#capGenBtn');
+  btn.disabled = true; btn.textContent = '✦ Generating…';
+  $('#capOutput').classList.add('hide');
+
+  try {
+    const r = await fetch('/api/creative/captions', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + TOKEN, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brief, platform: $('#cap_platform').value, tone: $('#cap_tone').value })
+    });
+    const data = await r.json();
+    if (data.error) { alert('Error: ' + data.error); return; }
+
+    renderCaptions(data.captions || []);
+    $('#capOutput').classList.remove('hide');
+  } catch(e) {
+    alert('Error: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = '✦ Generate Captions';
+  }
+};
+
+function renderCaptions(captions) {
+  const grid = $('#capGrid');
+  grid.innerHTML = '';
+  captions.forEach(c => {
+    const color = ANGLE_COLORS[c.angle] || 'var(--muted)';
+    const card = document.createElement('div');
+    card.className = 'cap-card';
+    card.innerHTML = `
+      <div class="cap-card-top">
+        <span class="badge" style="background:transparent;border:1px solid ${color};color:${color}">${esc(c.angle)}</span>
+        <span class="cap-angle"></span>
+        <button class="cap-copy-btn" data-caption="${escAttr(c.caption)}">Copy</button>
+      </div>
+      <div class="cap-text">${esc(c.caption)}</div>
+      ${c.note ? `<div class="cap-note">💡 ${esc(c.note)}</div>` : ''}`;
+    grid.appendChild(card);
+  });
+  grid.querySelectorAll('.cap-copy-btn').forEach(btn => {
+    btn.onclick = () => {
+      navigator.clipboard.writeText(btn.dataset.caption);
+      btn.textContent = 'Copied ✓'; btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+    };
+  });
+}
+
+$('#capClear').onclick = () => {
+  $('#cap_brief').value = '';
+  $('#capGrid').innerHTML = '';
+  $('#capOutput').classList.add('hide');
+};
 
 // ===== STORYBOARD =====
 let sbPanels = [];
