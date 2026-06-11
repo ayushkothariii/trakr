@@ -78,10 +78,13 @@ async function initDb() {
 
   // Migrations — safe to run every boot
   const newCols = [
-    ['creative_research', 'headline', 'TEXT DEFAULT ""'],
-    ['creative_research', 'caption',  'TEXT DEFAULT ""'],
-    ['creative_research', 'cta',      'TEXT DEFAULT ""'],
-    ['creative_research', 'platform', 'TEXT DEFAULT ""'],
+    ['creative_research',    'headline', 'TEXT DEFAULT ""'],
+    ['creative_research',    'caption',  'TEXT DEFAULT ""'],
+    ['creative_research',    'cta',      'TEXT DEFAULT ""'],
+    ['creative_research',    'platform', 'TEXT DEFAULT ""'],
+    ['creative_research',    'game',     'TEXT DEFAULT "tmkoc"'],
+    ['creative_competitors', 'game',     'TEXT DEFAULT "tmkoc"'],
+    ['creative_scripts',     'game',     'TEXT DEFAULT "tmkoc"'],
   ];
   for (const [table, col, def] of newCols) {
     try { await db.execute(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`); } catch(e) {}

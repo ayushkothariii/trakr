@@ -154,6 +154,14 @@ button.ok{background:#166534;color:var(--ok);border:1px solid #166534}
 .api-notice{background:#1a1206;border:1px solid #4a3010;border-radius:10px;padding:14px 16px;font-size:13px;color:var(--warn);margin-bottom:16px}
 .api-notice a{color:var(--warn)}
 
+/* game switcher */
+.game-switcher{padding:10px 10px;border-bottom:1px solid var(--line)}
+.game-pill-group{display:flex;gap:3px;background:var(--panel2);border-radius:8px;padding:3px;border:1px solid var(--line2)}
+.game-pill{flex:1;padding:6px 8px;border-radius:6px;font-size:11px;font-weight:700;background:transparent;border:0;color:var(--muted);cursor:pointer;transition:all .15s;font-family:var(--sans)}
+.game-pill:hover{color:var(--text)}
+.game-pill.active{background:var(--accent);color:#150b2a}
+.game-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--faint);padding:8px 12px 4px}
+
 /* captions */
 .cap-grid{display:flex;flex-direction:column;gap:12px;margin-top:4px}
 .cap-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
@@ -226,6 +234,14 @@ button.ok{background:#166534;color:var(--ok);border:1px solid #166534}
     <div class="mark"><span></span><span></span><span></span></div>
     <h1>trackr</h1>
     <div class="sub">creative studio</div>
+  </div>
+
+  <div class="game-switcher">
+    <div class="game-label">Active Game</div>
+    <div class="game-pill-group">
+      <button class="game-pill active" data-game="tmkoc">🎓 TMKOC</button>
+      <button class="game-pill" data-game="gada">🛒 Gada</button>
+    </div>
   </div>
 
   <div class="sidebar-section">Analytics</div>
@@ -509,11 +525,19 @@ button.ok{background:#166534;color:var(--ok);border:1px solid #166534}
 const $=s=>document.querySelector(s);
 let TOKEN=localStorage.getItem('trackr_token')||'';
 let editingId=null;
+let currentGame=localStorage.getItem('trackr_game')||'tmkoc';
+
+const GAME_NAMES = { tmkoc: 'TMKOC Playschool', gada: 'Gada Electronics' };
+const GADA_COMPETITORS = ['Pizza Ready','Burger Please','Outlets Rush'];
 
 async function api(path,opts={}){
   const r=await fetch(path,{...opts,headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json',...(opts.headers||{})}});
   if(r.status===401)throw new Error('unauthorized');
   return r.json();
+}
+
+function gp(sep='?'){
+  return sep+'game='+currentGame;
 }
 
 // Gate
@@ -526,8 +550,21 @@ function showApp(){
   $('#gate').classList.add('hide');
   $('#sidebar').classList.remove('hide');$('#app').classList.remove('hide');
   $('#origin').textContent=location.hostname;
+  applyGame(currentGame, false);
   loadAll();
 }
+
+function applyGame(game, reload=true){
+  currentGame=game;
+  localStorage.setItem('trackr_game', game);
+  document.querySelectorAll('.game-pill').forEach(p=>p.classList.toggle('active', p.dataset.game===game));
+  document.querySelector('.page-header p').textContent = GAME_NAMES[game] || game;
+  if(reload) loadAll();
+}
+
+document.querySelectorAll('.game-pill').forEach(p=>{
+  p.onclick=()=>{ if(p.dataset.game!==currentGame) applyGame(p.dataset.game); };
+});
 $('#enter').onclick=tryToken;
 $('#token').addEventListener('keydown',e=>{if(e.key==='Enter')tryToken();});
 async function tryToken(){
@@ -549,8 +586,18 @@ function switchTab(key){
 document.querySelectorAll('.nav-sub').forEach(t=>{t.onclick=()=>switchTab(t.dataset.tab);});
 
 // ===== COMPETITORS =====
+async function seedGadaCompetitors(){
+  const existing=await api('/api/creative/competitors'+gp());
+  const names=existing.map(c=>c.name);
+  for(const name of GADA_COMPETITORS){
+    if(!names.includes(name)){
+      await api('/api/creative/competitors',{method:'POST',body:JSON.stringify({name,game:'gada',notes:'IN'})});
+    }
+  }
+}
+
 async function loadCompetitors(){
-  const list=await api('/api/creative/competitors');
+  const list=await api('/api/creative/competitors'+gp());
   // populate research dropdown
   const sel=$('#r_competitor');
   const prev=sel.value;
@@ -630,7 +677,8 @@ function renderAds(ads, box, competitorName){
       title:`${b.dataset.comp} — fetched ad`,
       content:b.dataset.copy,
       competitor:b.dataset.comp,
-      format:'Meta Ad'
+      format:'Meta Ad',
+      game:currentGame,
     })});
     b.textContent='✓ Saved';b.disabled=true;
     loadResearch();
@@ -640,14 +688,14 @@ function renderAds(ads, box, competitorName){
 $('#addComp').onclick=async()=>{
   const name=$('#c_name').value.trim();if(!name)return;
   const country=$('#c_country').value.trim()||'IN';
-  await api('/api/creative/competitors',{method:'POST',body:JSON.stringify({name,ad_lib_url:'',notes:country})});
+  await api('/api/creative/competitors',{method:'POST',body:JSON.stringify({name,ad_lib_url:'',notes:country,game:currentGame})});
   ['c_name','c_country','c_notes'].forEach(id=>{ const el=$('#'+id); if(el) el.value=''; });
   flash('#cMsg');loadCompetitors();
 };
 
 // ===== RESEARCH =====
 async function loadResearch(){
-  const list=await api('/api/creative/research');
+  const list=await api('/api/creative/research'+gp());
   const box=$('#researchList');
   if(!list.length){box.innerHTML='<div class="empty-state">No observations yet. Watch competitor ads and capture what works.</div>';return;}
   box.innerHTML='';
@@ -701,6 +749,7 @@ $('#addResearch').onclick=async()=>{
     caption:$('#r_caption').value,
     cta:$('#r_cta').value,
     platform:$('#r_platform').value,
+    game:currentGame,
   })});
   ['r_title','r_content','r_hook','r_headline','r_caption','r_cta'].forEach(id=>$('#'+id).value='');
   ['r_competitor','r_format','r_platform'].forEach(id=>$('#'+id).value='');
@@ -717,7 +766,7 @@ const STAGES=[
   {key:'live',label:'Live',color:'#C084FC'},
 ];
 async function loadKanban(){
-  const scripts=await api('/api/creative/scripts');
+  const scripts=await api('/api/creative/scripts'+gp());
   const board=$('#kanban');board.innerHTML='';
   STAGES.forEach(st=>{
     const cards=scripts.filter(s=>s.status===st.key);
@@ -761,7 +810,7 @@ $('#closeModal').onclick=()=>$('#scriptModal').classList.add('hide');
 $('#scriptModal').onclick=e=>{if(e.target===$('#scriptModal'))$('#scriptModal').classList.add('hide');};
 
 $('#saveScript').onclick=async()=>{
-  const body={title:$('#m_title').value.trim(),brief:$('#m_brief').value,script:$('#m_script').value,status:$('#m_status').value,platform:$('#m_platform').value,notes:$('#m_notes').value};
+  const body={title:$('#m_title').value.trim(),brief:$('#m_brief').value,script:$('#m_script').value,status:$('#m_status').value,platform:$('#m_platform').value,notes:$('#m_notes').value,game:currentGame};
   if(!body.title)return;
   if(editingId){await api('/api/creative/scripts/'+editingId,{method:'PUT',body:JSON.stringify(body)});}
   else{await api('/api/creative/scripts',{method:'POST',body:JSON.stringify(body)});}
@@ -783,7 +832,7 @@ async function generateScript(){
   aiOut.className='ai-out ai-loading';aiOut.textContent='✦ Generating script…';
   $('#generateBtn').disabled=true;
   try{
-    const r=await api('/api/creative/generate',{method:'POST',body:JSON.stringify({brief,research:$('#m_research').value})});
+    const r=await api('/api/creative/generate',{method:'POST',body:JSON.stringify({brief,research:$('#m_research').value,game:currentGame})});
     if(r.error){
       aiOut.className='ai-out';aiOut.style.color='var(--danger)';aiOut.textContent=r.error;
       if(r.error.includes('ANTHROPIC_API_KEY'))$('#apiNotice').style.display='block';
@@ -830,7 +879,7 @@ $('#capGenBtn').onclick = async () => {
     const r = await fetch('/api/creative/captions', {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + TOKEN, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brief, platform: $('#cap_platform').value, tone: $('#cap_tone').value })
+      body: JSON.stringify({ brief, platform: $('#cap_platform').value, tone: $('#cap_tone').value, game: currentGame })
     });
     const data = await r.json();
     if (data.error) { alert('Error: ' + data.error); return; }
@@ -892,7 +941,7 @@ $('#sbGenBtn').onclick = async () => {
     const r = await fetch('/api/creative/storyboard', {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + TOKEN, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brief })
+      body: JSON.stringify({ brief, game: currentGame })
     });
     const data = await r.json();
     if (data.error) { alert('Error: ' + data.error); return; }
@@ -940,7 +989,7 @@ $('#sbSaveScript').onclick = async () => {
   ).join('\n\n');
   await api('/api/creative/scripts', { method: 'POST', body: JSON.stringify({
     title: brief.slice(0, 60) + (brief.length > 60 ? '…' : ''),
-    brief, script, status: 'script', platform: 'All', notes: 'AI storyboard'
+    brief, script, status: 'script', platform: 'All', notes: 'AI storyboard', game: currentGame,
   })});
   const btn = $('#sbSaveScript');
   btn.textContent = '✓ Saved to Pipeline'; btn.disabled = true;
@@ -1052,6 +1101,7 @@ $('#vaSaveBtn').onclick = async () => {
     caption: '',
     cta: '',
     platform: url.includes('youtube') ? 'YouTube' : 'Video',
+    game: currentGame,
   })});
   const btn = $('#vaSaveBtn');
   btn.textContent = '✓ Saved!'; btn.disabled = true;
@@ -1060,6 +1110,7 @@ $('#vaSaveBtn').onclick = async () => {
 };
 
 async function loadAll(){
+  if(currentGame==='gada') await seedGadaCompetitors();
   await Promise.all([loadKanban(),loadResearch(),loadCompetitors()]);
 }
 

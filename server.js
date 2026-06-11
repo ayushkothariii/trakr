@@ -33,6 +33,24 @@ const ADMIN_TOKEN = process.env.ADMIN_TOKEN || 'changeme';
 const BASE_URL = process.env.BASE_URL || '';
 const IOS_MATCH_WINDOW_MS = 1000 * 60 * 60 * 24; // 24h
 
+// ---------- game context ----------
+function gameCtx(game) {
+  if (game === 'gada') return {
+    appName: 'Gada Electronics',
+    genre: 'casual mobile shop management game',
+    audience: 'casual mobile gamers aged 18–35',
+    competitors: 'Pizza Ready, Burger Please, Outlets Rush',
+    adStyle: 'fun, fast-paced, colourful gameplay showcase, addictive loop',
+  };
+  return {
+    appName: 'TMKOC Playschool',
+    genre: 'kids educational app',
+    audience: 'parents of children aged 2–8',
+    competitors: 'Kiddopia, ABCmouse, Cocomelon, Khan Academy Kids',
+    adStyle: 'warm, cheerful, educational, trust-building, parent-focused',
+  };
+}
+
 // ---------- helpers ----------
 function detectDevice(ua = '') {
   const u = ua.toLowerCase();
@@ -250,13 +268,14 @@ app.get('/api/creative/fetch-ads', requireAdmin, async (req, res) => {
 
 // --- Competitors ---
 app.get('/api/creative/competitors', requireAdmin, async (req, res) => {
-  const r = await db.execute('SELECT * FROM creative_competitors ORDER BY created_at DESC');
+  const game = req.query.game || 'tmkoc';
+  const r = await db.execute({ sql: 'SELECT * FROM creative_competitors WHERE game = ? ORDER BY created_at DESC', args: [game] });
   res.json(r.rows);
 });
 app.post('/api/creative/competitors', requireAdmin, async (req, res) => {
-  const { name, ad_lib_url, notes } = req.body;
+  const { name, ad_lib_url, notes, game = 'tmkoc' } = req.body;
   if (!name) return res.status(400).json({ error: 'name required' });
-  await db.execute({ sql: 'INSERT INTO creative_competitors (name, ad_lib_url, notes, created_at) VALUES (?,?,?,?)', args: [name, ad_lib_url||'', notes||'', Date.now()] });
+  await db.execute({ sql: 'INSERT INTO creative_competitors (name, ad_lib_url, notes, game, created_at) VALUES (?,?,?,?,?)', args: [name, ad_lib_url||'', notes||'', game, Date.now()] });
   res.json({ ok: true });
 });
 app.delete('/api/creative/competitors/:id', requireAdmin, async (req, res) => {
@@ -266,13 +285,14 @@ app.delete('/api/creative/competitors/:id', requireAdmin, async (req, res) => {
 
 // --- Research ---
 app.get('/api/creative/research', requireAdmin, async (req, res) => {
-  const r = await db.execute('SELECT * FROM creative_research ORDER BY created_at DESC');
+  const game = req.query.game || 'tmkoc';
+  const r = await db.execute({ sql: 'SELECT * FROM creative_research WHERE game = ? ORDER BY created_at DESC', args: [game] });
   res.json(r.rows);
 });
 app.post('/api/creative/research', requireAdmin, async (req, res) => {
-  const { title, content, competitor, hook, format, headline, caption, cta, platform } = req.body;
+  const { title, content, competitor, hook, format, headline, caption, cta, platform, game = 'tmkoc' } = req.body;
   if (!title) return res.status(400).json({ error: 'title required' });
-  await db.execute({ sql: 'INSERT INTO creative_research (title, content, competitor, hook, format, headline, caption, cta, platform, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)', args: [title, content||'', competitor||'', hook||'', format||'', headline||'', caption||'', cta||'', platform||'', Date.now()] });
+  await db.execute({ sql: 'INSERT INTO creative_research (title, content, competitor, hook, format, headline, caption, cta, platform, game, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)', args: [title, content||'', competitor||'', hook||'', format||'', headline||'', caption||'', cta||'', platform||'', game, Date.now()] });
   res.json({ ok: true });
 });
 app.delete('/api/creative/research/:id', requireAdmin, async (req, res) => {
@@ -282,14 +302,15 @@ app.delete('/api/creative/research/:id', requireAdmin, async (req, res) => {
 
 // --- Scripts ---
 app.get('/api/creative/scripts', requireAdmin, async (req, res) => {
-  const r = await db.execute('SELECT * FROM creative_scripts ORDER BY updated_at DESC');
+  const game = req.query.game || 'tmkoc';
+  const r = await db.execute({ sql: 'SELECT * FROM creative_scripts WHERE game = ? ORDER BY updated_at DESC', args: [game] });
   res.json(r.rows);
 });
 app.post('/api/creative/scripts', requireAdmin, async (req, res) => {
-  const { title, brief, script, status, platform, notes } = req.body;
+  const { title, brief, script, status, platform, notes, game = 'tmkoc' } = req.body;
   if (!title) return res.status(400).json({ error: 'title required' });
   const now = Date.now();
-  const r = await db.execute({ sql: 'INSERT INTO creative_scripts (title, brief, script, status, platform, notes, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)', args: [title, brief||'', script||'', status||'brief', platform||'', notes||'', now, now] });
+  const r = await db.execute({ sql: 'INSERT INTO creative_scripts (title, brief, script, status, platform, notes, game, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?)', args: [title, brief||'', script||'', status||'brief', platform||'', notes||'', game, now, now] });
   res.json({ ok: true, id: Number(r.lastInsertRowid) });
 });
 app.put('/api/creative/scripts/:id', requireAdmin, async (req, res) => {
@@ -306,9 +327,10 @@ app.delete('/api/creative/scripts/:id', requireAdmin, async (req, res) => {
 app.post('/api/creative/generate', requireAdmin, async (req, res) => {
   const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
   if (!ANTHROPIC_API_KEY) return res.status(400).json({ error: 'ANTHROPIC_API_KEY not set in environment variables.' });
-  const { brief, research } = req.body;
+  const { brief, research, game = 'tmkoc' } = req.body;
   if (!brief) return res.status(400).json({ error: 'brief required' });
-  const prompt = `You are an expert creative script writer for kids educational apps (like Kiddopia, ABCmouse, Cocomelon). Write a punchy 30-second video ad script for all platforms (Meta, YouTube, TikTok).
+  const ctx = gameCtx(game);
+  const prompt = `You are an expert creative script writer for ${ctx.appName}, a ${ctx.genre}. Write a punchy 30-second video ad script targeting ${ctx.audience} for all platforms (Meta, YouTube, TikTok). Style: ${ctx.adStyle}.
 
 Brief: ${brief}
 ${research ? `Competitor insights: ${research}` : ''}
@@ -340,11 +362,12 @@ app.post('/api/creative/captions', requireAdmin, async (req, res) => {
   const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
   if (!ANTHROPIC_API_KEY) return res.status(400).json({ error: 'ANTHROPIC_API_KEY not set.' });
 
-  const { brief, platform, tone } = req.body;
+  const { brief, platform, tone, game = 'tmkoc' } = req.body;
   if (!brief) return res.status(400).json({ error: 'brief required' });
+  const ctx = gameCtx(game);
 
   // Pull research for context
-  const researchResult = await db.execute('SELECT * FROM creative_research ORDER BY created_at DESC LIMIT 8');
+  const researchResult = await db.execute({ sql: 'SELECT * FROM creative_research WHERE game = ? ORDER BY created_at DESC LIMIT 8', args: [game] });
   const researchContext = researchResult.rows.map(r => [
     r.title,
     r.caption  ? `Caption: ${r.caption}` : '',
@@ -352,7 +375,7 @@ app.post('/api/creative/captions', requireAdmin, async (req, res) => {
     r.cta      ? `CTA: ${r.cta}` : '',
   ].filter(Boolean).join(' | ')).join('\n');
 
-  const prompt = `You are an expert social media copywriter for kids educational apps (Kiddopia, ABCmouse, Cocomelon style). Write captions for parents of children aged 2–8.
+  const prompt = `You are an expert social media copywriter for ${ctx.appName}, a ${ctx.genre}. Target audience: ${ctx.audience}. Competitors: ${ctx.competitors}. Ad style: ${ctx.adStyle}.
 
 Brief: ${brief}
 Platform: ${platform || 'All platforms'}
@@ -408,11 +431,12 @@ app.post('/api/creative/storyboard', requireAdmin, async (req, res) => {
   if (!ANTHROPIC_API_KEY) return res.status(400).json({ error: 'ANTHROPIC_API_KEY not set.' });
   if (!XAI_API_KEY) return res.status(400).json({ error: 'XAI_API_KEY not set. Add it to your Render environment variables.' });
 
-  const { brief } = req.body;
+  const { brief, game = 'tmkoc' } = req.body;
   if (!brief) return res.status(400).json({ error: 'brief required' });
+  const ctx = gameCtx(game);
 
   // Pull recent research for trend context
-  const researchResult = await db.execute('SELECT * FROM creative_research ORDER BY created_at DESC LIMIT 10');
+  const researchResult = await db.execute({ sql: 'SELECT * FROM creative_research WHERE game = ? ORDER BY created_at DESC LIMIT 10', args: [game] });
   const researchContext = researchResult.rows.map(r => [
     r.title,
     r.hook     ? `Hook: ${r.hook}` : '',
@@ -422,7 +446,7 @@ app.post('/api/creative/storyboard', requireAdmin, async (req, res) => {
 
   try {
     // Step 1: Claude generates 6 scene descriptions + image prompts
-    const claudePrompt = `You are a storyboard director specialising in kids educational app video ads (Kiddopia, ABCmouse, Cocomelon, Khan Academy Kids).
+    const claudePrompt = `You are a storyboard director specialising in video ads for ${ctx.appName}, a ${ctx.genre}. Target audience: ${ctx.audience}. Competitors: ${ctx.competitors}. Visual style: ${ctx.adStyle}.
 
 Brief: ${brief}
 ${researchContext ? `\nCompetitor research & trends:\n${researchContext}` : ''}
@@ -437,7 +461,7 @@ Return ONLY a valid JSON array — no markdown, no explanation.
     "label": "Hook",
     "voiceover": "...",
     "scene_description": "What the animator sees — characters, action, setting, mood",
-    "image_prompt": "Bright colorful 2D kids animation, [specific scene details], cheerful warm palette, Cocomelon art style, storyboard frame, NO text or letters visible in image"
+    "image_prompt": "${ctx.genre === 'kids educational app' ? 'Bright colorful 2D kids animation, Cocomelon art style, cheerful warm palette' : 'Colorful casual mobile game UI art style, vibrant, cartoon shop setting'}, [specific scene details], storyboard frame, NO text or letters visible in image"
   }
 ]
 
