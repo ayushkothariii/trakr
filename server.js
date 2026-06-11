@@ -427,9 +427,7 @@ Rules:
 // --- Storyboard Generation ---
 app.post('/api/creative/storyboard', requireAdmin, async (req, res) => {
   const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-  const XAI_API_KEY = process.env.XAI_API_KEY;
   if (!ANTHROPIC_API_KEY) return res.status(400).json({ error: 'ANTHROPIC_API_KEY not set.' });
-  if (!XAI_API_KEY) return res.status(400).json({ error: 'XAI_API_KEY not set. Add it to your Render environment variables.' });
 
   const { brief, game = 'tmkoc' } = req.body;
   if (!brief) return res.status(400).json({ error: 'brief required' });
@@ -485,33 +483,20 @@ Make image_prompts highly visual and scene-specific. Always end with: cheerful w
       return res.status(500).json({ error: 'Could not parse scene list. Try again.' });
     }
 
-    // Step 2: Generate images with Grok in parallel (with per-image timeout)
+    // Step 2: Generate images with Pollinations.ai (free, no API key needed)
     const imagePromises = scenes.map(async (scene) => {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 45000);
       try {
-        const r = await fetch('https://api.x.ai/v1/images/generations', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${XAI_API_KEY}` },
-          body: JSON.stringify({ model: 'grok-2-image-1212', prompt: scene.image_prompt, n: 1 }),
-          signal: controller.signal
-        });
-        const d = await r.json();
+        const encoded = encodeURIComponent(scene.image_prompt);
+        const image_url = `https://image.pollinations.ai/prompt/${encoded}?width=896&height=504&model=flux&nologo=true&seed=${scene.scene}`;
+        // Verify the image is reachable
+        const r = await fetch(image_url, { method: 'HEAD', signal: controller.signal });
         clearTimeout(timer);
-        console.log(`[storyboard] scene ${scene.scene} xAI response:`, JSON.stringify(d).slice(0, 300));
-
-        let image_url = null;
-        if (d.data?.[0]?.url) {
-          image_url = d.data[0].url;
-        } else if (d.data?.[0]?.b64_json) {
-          image_url = `data:image/png;base64,${d.data[0].b64_json}`;
-        }
-        const image_error = d.error?.message || (image_url ? null : `No image in response: ${JSON.stringify(d).slice(0, 120)}`);
-        return { ...scene, image_url, image_error };
+        return { ...scene, image_url: r.ok ? image_url : null, image_error: r.ok ? null : `HTTP ${r.status}` };
       } catch(e) {
         clearTimeout(timer);
-        console.error(`[storyboard] scene ${scene.scene} error:`, e.message);
-        return { ...scene, image_url: null, image_error: e.name === 'AbortError' ? 'timeout (45s)' : e.message };
+        return { ...scene, image_url: null, image_error: e.name === 'AbortError' ? 'timeout' : e.message };
       }
     });
 
