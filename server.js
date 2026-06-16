@@ -360,6 +360,115 @@ CAPTION: [social media caption with emojis]`;
   }
 });
 
+// ========== SOCIAL REACH ==========
+
+app.get('/api/reach/channels', requireAdmin, async (req, res) => {
+  const game = req.query.game || 'tmkoc';
+  const r = await db.execute({ sql: 'SELECT * FROM social_channels WHERE game = ? ORDER BY created_at ASC', args: [game] });
+  res.json(r.rows);
+});
+
+app.post('/api/reach/channels', requireAdmin, async (req, res) => {
+  const { name, platform, channel_id, game = 'tmkoc' } = req.body;
+  if (!name || !platform) return res.status(400).json({ error: 'name and platform required' });
+  const r = await db.execute({ sql: 'INSERT INTO social_channels (name, platform, channel_id, game, created_at) VALUES (?,?,?,?,?)', args: [name, platform, channel_id || '', game, Date.now()] });
+  res.json({ ok: true, id: Number(r.lastInsertRowid) });
+});
+
+app.delete('/api/reach/channels/:id', requireAdmin, async (req, res) => {
+  await db.execute({ sql: 'DELETE FROM social_channels WHERE id = ?', args: [req.params.id] });
+  await db.execute({ sql: 'DELETE FROM social_snapshots WHERE channel_id = ?', args: [req.params.id] });
+  res.json({ ok: true });
+});
+
+app.get('/api/reach/snapshots/:channelId', requireAdmin, async (req, res) => {
+  const r = await db.execute({ sql: 'SELECT * FROM social_snapshots WHERE channel_id = ? ORDER BY ts ASC', args: [req.params.channelId] });
+  res.json(r.rows);
+});
+
+// Manual snapshot entry
+app.post('/api/reach/manual/:id', requireAdmin, async (req, res) => {
+  const { followers = 0, views = 0, posts = 0 } = req.body;
+  await db.execute({ sql: 'INSERT INTO social_snapshots (channel_id, ts, followers, views, posts, extra) VALUES (?,?,?,?,?,?)', args: [req.params.id, Date.now(), followers, views, posts, '{}'] });
+  res.json({ ok: true });
+});
+
+// Auto-fetch a single channel
+app.post('/api/reach/fetch/:id', requireAdmin, async (req, res) => {
+  const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
+  const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
+
+  const ch = await db.execute({ sql: 'SELECT * FROM social_channels WHERE id = ?', args: [req.params.id] });
+  const channel = ch.rows[0];
+  if (!channel) return res.status(404).json({ error: 'channel not found' });
+
+  let followers = 0, views = 0, posts = 0, extra = {};
+
+  try {
+    if (channel.platform === 'youtube') {
+      if (!YOUTUBE_API_KEY) return res.status(400).json({ error: 'YOUTUBE_API_KEY not set in Render environment variables.' });
+      let cid = channel.channel_id.trim();
+      // Resolve handle (@name) to channel ID
+      if (cid.startsWith('@') || (!cid.startsWith('UC') && !cid.startsWith('http'))) {
+        const handle = cid.startsWith('@') ? cid.slice(1) : cid;
+        const hr = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=id&forHandle=${encodeURIComponent(handle)}&key=${YOUTUBE_API_KEY}`);
+        const hd = await hr.json();
+        cid = hd.items?.[0]?.id || cid;
+      }
+      if (cid.includes('youtube.com')) {
+        const m = cid.match(/channel\/([^/?\s]+)/);
+        if (m) cid = m[1];
+      }
+      // Get channel stats
+      const sr = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=statistics,snippet&id=${encodeURIComponent(cid)}&key=${YOUTUBE_API_KEY}`);
+      const sd = await sr.json();
+      if (sd.error) return res.status(400).json({ error: sd.error.message });
+      const stats = sd.items?.[0]?.statistics;
+      if (!stats) return res.status(400).json({ error: 'Channel not found. Check the channel ID.' });
+      followers = parseInt(stats.subscriberCount) || 0;
+      views = parseInt(stats.viewCount) || 0;
+      posts = parseInt(stats.videoCount) || 0;
+      // Get latest 5 videos
+      const vr = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${encodeURIComponent(cid)}&order=date&maxResults=5&type=video&key=${YOUTUBE_API_KEY}`);
+      const vd = await vr.json();
+      const videoIds = (vd.items || []).map(v => v.id?.videoId).filter(Boolean).join(',');
+      if (videoIds) {
+        const vsr = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=statistics,snippet&id=${encodeURIComponent(videoIds)}&key=${YOUTUBE_API_KEY}`);
+        const vsd = await vsr.json();
+        extra.recentVideos = (vsd.items || []).map(v => ({
+          title: v.snippet?.title,
+          views: parseInt(v.statistics?.viewCount) || 0,
+          likes: parseInt(v.statistics?.likeCount) || 0,
+          published: v.snippet?.publishedAt?.slice(0, 10),
+          thumb: v.snippet?.thumbnails?.medium?.url,
+          url: `https://youtube.com/watch?v=${v.id}`
+        }));
+      }
+    } else if (channel.platform === 'instagram') {
+      if (!META_ACCESS_TOKEN) return res.status(400).json({ error: 'META_ACCESS_TOKEN not set.' });
+      const r2 = await fetch(`https://graph.facebook.com/v19.0/${encodeURIComponent(channel.channel_id)}?fields=instagram_business_account{followers_count,media_count,name}&access_token=${META_ACCESS_TOKEN}`);
+      const d = await r2.json();
+      const ig = d.instagram_business_account;
+      if (!ig) return res.status(400).json({ error: d.error?.message || 'Could not fetch Instagram. Make sure the channel_id is a Facebook Page ID with a connected Instagram Business account.' });
+      followers = ig.followers_count || 0;
+      posts = ig.media_count || 0;
+    } else if (channel.platform === 'facebook') {
+      if (!META_ACCESS_TOKEN) return res.status(400).json({ error: 'META_ACCESS_TOKEN not set.' });
+      const r2 = await fetch(`https://graph.facebook.com/v19.0/${encodeURIComponent(channel.channel_id)}?fields=fan_count,followers_count,posts.limit(1).summary(true)&access_token=${META_ACCESS_TOKEN}`);
+      const d = await r2.json();
+      if (d.error) return res.status(400).json({ error: d.error.message });
+      followers = d.followers_count || d.fan_count || 0;
+      posts = d.posts?.summary?.total_count || 0;
+    } else {
+      return res.status(400).json({ error: 'Use manual entry for LinkedIn and Snapchat.' });
+    }
+    await db.execute({ sql: 'INSERT INTO social_snapshots (channel_id, ts, followers, views, posts, extra) VALUES (?,?,?,?,?,?)', args: [channel.id, Date.now(), followers, views, posts, JSON.stringify(extra)] });
+    res.json({ ok: true, followers, views, posts, extra });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // --- Caption Suggestions ---
 app.post('/api/creative/captions', requireAdmin, async (req, res) => {
   const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;

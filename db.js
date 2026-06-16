@@ -63,6 +63,27 @@ async function initDb() {
       created_at   INTEGER NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS social_channels (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      name        TEXT NOT NULL,
+      platform    TEXT NOT NULL,
+      channel_id  TEXT DEFAULT '',
+      game        TEXT DEFAULT 'tmkoc',
+      created_at  INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS social_snapshots (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      channel_id  INTEGER NOT NULL,
+      ts          INTEGER NOT NULL,
+      followers   INTEGER DEFAULT 0,
+      views       INTEGER DEFAULT 0,
+      posts       INTEGER DEFAULT 0,
+      extra       TEXT DEFAULT '{}'
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_snapshots_channel ON social_snapshots(channel_id, ts);
+
     CREATE TABLE IF NOT EXISTS creative_scripts (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
       title       TEXT NOT NULL,

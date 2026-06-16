@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>trackr — social reach</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0B0E14;--panel:#131823;--panel2:#0F141D;--line:#222A38;--line2:#2C3648;
+  --text:#E7EAF1;--muted:#7C8597;--faint:#525C6E;
+  --accent:#C084FC;--ok:#4ADE80;--warn:#FBBF24;--danger:#F87171;
+  --clicks:#4CC2FF;--installs:#FF8A3D;
+  --yt:#FF4444;--ig:#E1306C;--fb:#1877F2;--li:#0A66C2;--sc:#FFFC00;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+  --sans:'Inter',system-ui,sans-serif;
+  --sidebar:220px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;display:flex;min-height:100vh}
+.sidebar{width:var(--sidebar);flex:none;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:10;overflow-y:auto}
+.sidebar-logo{padding:22px 18px 18px;border-bottom:1px solid var(--line)}
+.sidebar-logo .mark{width:26px;height:26px;position:relative;margin-bottom:10px}
+.sidebar-logo .mark span{position:absolute;inset:0;border-radius:50%;border:2px solid var(--ok);opacity:.35}
+.sidebar-logo .mark span:nth-child(2){inset:5px;opacity:.6}
+.sidebar-logo .mark span:nth-child(3){inset:10px;border-color:var(--ok);opacity:1;animation:pulse 2.6s ease-in-out infinite}
+@keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(.7);opacity:.5}}
+.sidebar-logo h1{font-family:var(--mono);font-size:15px;font-weight:700}
+.sidebar-logo .sub{font-size:11px;color:var(--faint);margin-top:2px}
+.game-switcher{padding:10px;border-bottom:1px solid var(--line)}
+.game-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--faint);padding:0 2px 4px}
+.game-pill-group{display:flex;gap:3px;background:var(--panel2);border-radius:8px;padding:3px;border:1px solid var(--line2)}
+.game-pill{flex:1;padding:6px 8px;border-radius:6px;font-size:11px;font-weight:700;background:transparent;border:0;color:var(--muted);cursor:pointer;transition:all .15s;font-family:var(--sans)}
+.game-pill:hover{color:var(--text)}
+.game-pill.active{background:var(--ok);color:#071a0f}
+.sidebar-section{padding:16px 10px 4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--faint)}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;margin:1px 6px;cursor:pointer;font-size:13px;font-weight:500;color:var(--muted);transition:all .15s;text-decoration:none}
+.nav-item:hover{background:var(--panel2);color:var(--text)}
+.nav-item.active{background:var(--panel2);color:var(--text);border:1px solid var(--line2)}
+.nav-item .icon{font-size:15px;width:20px;text-align:center;flex:none}
+.sidebar-bottom{margin-top:auto;padding:14px 10px;border-top:1px solid var(--line)}
+.sidebar-user{font-size:11px;color:var(--muted);padding:8px 12px;display:flex;align-items:center;gap:8px}
+.sidebar-user .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);flex:none}
+.main{margin-left:var(--sidebar);flex:1;padding:30px 32px 80px;max-width:calc(100vw - var(--sidebar))}
+.gate-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;width:100%;position:fixed;inset:0;background:var(--bg);z-index:50}
+.gate{max-width:360px;width:100%;text-align:center;padding:0 20px}
+.gate h2{font-weight:700;font-size:20px;margin:0 0 6px;font-family:var(--mono)}
+.gate p{color:var(--muted);font-size:13px;margin:0 0 20px}
+.err{color:#ff7a7a;font-size:12.5px;font-family:var(--mono);margin-top:8px;min-height:16px}
+.hide{display:none!important}
+input,textarea,select{width:100%;background:var(--panel2);border:1px solid var(--line2);color:var(--text);border-radius:8px;padding:10px 12px;font-family:var(--mono);font-size:13px;outline:none;resize:vertical}
+input:focus,textarea:focus,select:focus{border-color:var(--ok)}
+input::placeholder{color:var(--faint)}
+select option{background:var(--panel2)}
+label.fld{display:block;margin:0 0 12px}
+label.fld .k{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:5px}
+button{cursor:pointer;border:0;border-radius:8px;font-family:var(--sans);font-weight:600;font-size:13px;padding:9px 16px;background:var(--ok);color:#071a0f;transition:opacity .15s}
+button:hover{opacity:.85}
+button:disabled{opacity:.4;cursor:default}
+button.ghost{background:transparent;border:1px solid var(--line2);color:var(--muted);font-weight:500}
+button.ghost:hover{color:var(--text);border-color:var(--faint)}
+button.danger{background:transparent;border:1px solid var(--line2);color:var(--faint)}
+button.danger:hover{color:var(--danger);border-color:#5a2020}
+button.sm{padding:5px 10px;font-size:12px}
+.form{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:24px}
+.form h3{font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:16px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 18px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+@media(max-width:900px){.grid3{grid-template-columns:1fr 1fr}}
+@media(max-width:600px){.grid2,.grid3{grid-template-columns:1fr}}
+.actions{display:flex;align-items:center;gap:10px;margin-top:4px;flex-wrap:wrap}
+.msg{font-family:var(--mono);font-size:12px;color:var(--ok);opacity:0;transition:opacity .3s}
+.msg.show{opacity:1}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);margin:0 0 14px}
+.page-header{margin-bottom:24px;padding-bottom:20px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.page-header h2{font-size:18px;font-weight:600}
+.page-header p{font-size:13px;color:var(--muted);margin-top:2px}
+
+/* summary bar */
+.summary-bar{display:flex;gap:14px;margin-bottom:28px;flex-wrap:wrap}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 20px;flex:1;min-width:130px}
+.stat .v{font-family:var(--mono);font-size:22px;font-weight:700;line-height:1}
+.stat .l{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-top:5px}
+
+/* platform badge */
+.plat{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:3px 8px;border-radius:5px;font-family:var(--mono)}
+.plat.youtube{background:#2a0d0d;color:var(--yt)}
+.plat.instagram{background:#2a0d18;color:var(--ig)}
+.plat.facebook{background:#0d1a2a;color:var(--fb)}
+.plat.linkedin{background:#0d1620;color:var(--li)}
+.plat.snapchat{background:#1f1f00;color:var(--sc)}
+
+/* channel cards */
+.channels-grid{display:flex;flex-direction:column;gap:14px}
+.ch-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
+.ch-top{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.ch-name{font-weight:600;font-size:15px;flex:1}
+.ch-stats{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:14px}
+.ch-stat .v{font-family:var(--mono);font-size:20px;font-weight:700;line-height:1}
+.ch-stat .l{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-top:3px}
+.ch-stat.followers .v{color:var(--ok)}
+.ch-stat.views .v{color:var(--clicks)}
+.ch-stat.posts .v{color:var(--accent)}
+.ch-foot{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-top:12px;border-top:1px solid var(--line2)}
+.last-updated{font-size:11px;color:var(--faint);font-family:var(--mono);margin-left:auto}
+
+/* sparkline */
+.sparkline-wrap{margin-bottom:12px}
+.sparkline-label{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);margin-bottom:4px;font-family:var(--mono)}
+svg.spark{display:block;overflow:visible}
+
+/* recent videos */
+.videos-section{margin-top:14px;padding-top:14px;border-top:1px solid var(--line2)}
+.videos-section .vs-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);margin-bottom:10px}
+.video-list{display:flex;flex-direction:column;gap:8px}
+.video-row{display:flex;align-items:center;gap:10px}
+.video-thumb{width:72px;height:40px;border-radius:4px;object-fit:cover;background:var(--panel2);flex:none}
+.video-info{flex:1;min-width:0}
+.video-title{font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.video-meta{font-size:11px;color:var(--muted);font-family:var(--mono);margin-top:2px}
+
+/* manual input modal */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal{background:var(--panel);border:1px solid var(--line2);border-radius:16px;padding:24px;width:100%;max-width:400px}
+.modal h2{font-size:15px;font-weight:600;margin-bottom:18px;display:flex;align-items:center;gap:10px}
+.modal h2 button{margin-left:auto;background:transparent;border:0;color:var(--muted);font-size:20px;padding:0}
+.empty-state{color:var(--muted);font-size:13px;text-align:center;padding:40px;border:1px dashed var(--line2);border-radius:14px}
+a{color:var(--clicks);text-decoration:none}
+</style>
+</head>
+<body>
+
+<!-- GATE -->
+<div class="gate-wrap" id="gate">
+  <div class="gate">
+    <div style="font-size:28px;margin-bottom:12px">📡</div>
+    <h2>trackr</h2>
+    <p>Enter your admin token to view social reach.</p>
+    <input id="token" type="password" placeholder="ADMIN_TOKEN" autocomplete="current-password"/>
+    <div class="err" id="gateErr"></div>
+    <div style="margin-top:14px"><button id="enter" style="background:var(--ok);color:#071a0f">Open dashboard</button></div>
+  </div>
+</div>
+
+<!-- SIDEBAR -->
+<nav class="sidebar hide" id="sidebar">
+  <div class="sidebar-logo">
+    <div class="mark"><span></span><span></span><span></span></div>
+    <h1>trackr</h1>
+    <div class="sub">social reach</div>
+  </div>
+
+  <div class="game-switcher">
+    <div class="game-label">Active Game</div>
+    <div class="game-pill-group">
+      <button class="game-pill active" data-game="tmkoc">🎓 TMKOC</button>
+      <button class="game-pill" data-game="gada">🛒 Gada</button>
+    </div>
+  </div>
+
+  <div class="sidebar-section">Analytics</div>
+  <a class="nav-item" href="/"><span class="icon">🔗</span> Attribution</a>
+  <a class="nav-item active" href="/reach.html"><span class="icon">📡</span> Social Reach</a>
+  <a class="nav-item" href="/creative.html"><span class="icon">✦</span> Creative Studio</a>
+
+  <div class="sidebar-bottom">
+    <div class="sidebar-user"><span class="dot"></span><span id="origin" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span></div>
+    <button class="ghost" id="logout" style="width:calc(100% - 12px);margin:4px 6px;font-size:12px;padding:8px">Sign out</button>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<main class="main hide" id="app">
+  <div class="page-header">
+    <div>
+      <h2>Social Reach</h2>
+      <p id="gameLabel">TMKOC Playschool</p>
+    </div>
+    <button id="fetchAllBtn">⚡ Fetch All</button>
+  </div>
+
+  <!-- Summary -->
+  <div class="summary-bar" id="summaryBar">
+    <div class="stat"><div class="v" id="totFollowers">—</div><div class="l">Total Followers</div></div>
+    <div class="stat"><div class="v" id="totViews">—</div><div class="l">Total Views</div></div>
+    <div class="stat"><div class="v" id="totChannels">—</div><div class="l">Channels</div></div>
+    <div class="stat"><div class="v" id="totPosts">—</div><div class="l">Total Posts</div></div>
+  </div>
+
+  <!-- Add channel form -->
+  <div class="form">
+    <h3>Add Channel / Account</h3>
+    <div class="grid2">
+      <label class="fld"><span class="k">Name</span>
+        <input id="c_name" placeholder="e.g. TMKOC Kids Official"/></label>
+      <label class="fld"><span class="k">Platform</span>
+        <select id="c_platform">
+          <option value="youtube">YouTube</option>
+          <option value="instagram">Instagram</option>
+          <option value="facebook">Facebook</option>
+          <option value="linkedin">LinkedIn</option>
+          <option value="snapchat">Snapchat</option>
+        </select>
+      </label>
+    </div>
+    <label class="fld"><span class="k">Channel ID / Handle <em>— YouTube: @handle or UCxxxx · Facebook/Instagram: Page ID · LinkedIn/Snapchat: leave blank for manual</em></span>
+      <input id="c_id" placeholder="@tmkockids  or  UCxxxxxxxxxxxxxxx  or  Facebook Page ID"/></label>
+    <div class="actions">
+      <button id="addChannelBtn">Add Channel</button>
+      <span class="msg" id="addMsg">Added!</span>
+    </div>
+  </div>
+
+  <p class="eyebrow">Your channels</p>
+  <div class="channels-grid" id="channelGrid">
+    <div class="empty-state">No channels yet. Add your YouTube and Instagram accounts above.</div>
+  </div>
+</main>
+
+<!-- MANUAL UPDATE MODAL -->
+<div class="modal-bg hide" id="manualModal">
+  <div class="modal">
+    <h2 id="manualTitle">Update stats <button id="closeManual">×</button></h2>
+    <label class="fld"><span class="k">Followers / Subscribers</span><input id="m_followers" type="number" placeholder="0"/></label>
+    <label class="fld"><span class="k">Total Views / Reach</span><input id="m_views" type="number" placeholder="0"/></label>
+    <label class="fld"><span class="k">Total Posts / Videos</span><input id="m_posts" type="number" placeholder="0"/></label>
+    <div class="actions" style="margin-top:12px">
+      <button id="saveManual">Save Snapshot</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+let TOKEN=localStorage.getItem('trackr_token')||'';
+let currentGame=localStorage.getItem('trackr_game')||'tmkoc';
+let manualChannelId=null;
+const GAME_NAMES={tmkoc:'TMKOC Playschool',gada:'Gada Electronics'};
+const PLAT_LABELS={youtube:'YouTube',instagram:'Instagram',facebook:'Facebook',linkedin:'LinkedIn',snapchat:'Snapchat'};
+
+async function api(path,opts={}){
+  const r=await fetch(path,{...opts,headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json',...(opts.headers||{})}});
+  if(r.status===401)throw new Error('unauthorized');
+  return r.json();
+}
+
+// Gate
+function showGate(msg){
+  $('#app').classList.add('hide');$('#sidebar').classList.add('hide');
+  $('#gate').classList.remove('hide');
+  if(msg)$('#gateErr').textContent=msg;$('#token').focus();
+}
+function showApp(){
+  $('#gate').classList.add('hide');
+  $('#sidebar').classList.remove('hide');$('#app').classList.remove('hide');
+  $('#origin').textContent=location.hostname;
+  applyGame(currentGame,false);
+  loadChannels();
+}
+$('#enter').onclick=tryToken;
+$('#token').addEventListener('keydown',e=>{if(e.key==='Enter')tryToken();});
+async function tryToken(){
+  TOKEN=$('#token').value.trim();
+  try{const r=await api('/api/whoami');if(r.ok){localStorage.setItem('trackr_token',TOKEN);showApp();}}
+  catch(e){$('#gateErr').textContent='That token was rejected.';}
+}
+$('#logout').onclick=()=>{localStorage.removeItem('trackr_token');TOKEN='';$('#token').value='';showGate('');};
+
+// Game switcher
+function applyGame(game,reload=true){
+  currentGame=game;
+  localStorage.setItem('trackr_game',game);
+  document.querySelectorAll('.game-pill').forEach(p=>p.classList.toggle('active',p.dataset.game===game));
+  $('#gameLabel').textContent=GAME_NAMES[game]||game;
+  if(reload)loadChannels();
+}
+document.querySelectorAll('.game-pill').forEach(p=>{p.onclick=()=>{if(p.dataset.game!==currentGame)applyGame(p.dataset.game);};});
+
+// Load channels
+async function loadChannels(){
+  const channels=await api('/api/reach/channels?game='+currentGame);
+  const grid=$('#channelGrid');
+  if(!channels.length){
+    grid.innerHTML='<div class="empty-state">No channels yet. Add your YouTube, Instagram, or other accounts above.</div>';
+    ['totFollowers','totViews','totChannels','totPosts'].forEach(id=>$('#'+id).textContent='0');
+    return;
+  }
+  // Fetch latest snapshot for each channel
+  const snapData=await Promise.all(channels.map(async c=>{
+    const snaps=await api('/api/reach/snapshots/'+c.id);
+    return {channel:c, snaps};
+  }));
+  // Summary
+  let totF=0,totV=0,totP=0;
+  snapData.forEach(({snaps})=>{
+    if(snaps.length){const s=snaps[snaps.length-1];totF+=Number(s.followers||0);totV+=Number(s.views||0);totP+=Number(s.posts||0);}
+  });
+  $('#totFollowers').textContent=fmt(totF);
+  $('#totViews').textContent=fmt(totV);
+  $('#totChannels').textContent=channels.length;
+  $('#totPosts').textContent=fmt(totP);
+  // Render cards
+  grid.innerHTML='';
+  snapData.forEach(({channel:c,snaps})=>{
+    const latest=snaps.length?snaps[snaps.length-1]:null;
+    const extra=latest?tryParse(latest.extra):{};
+    const card=document.createElement('div');card.className='ch-card';
+    const canFetch=['youtube','instagram','facebook'].includes(c.platform);
+    card.innerHTML=`
+      <div class="ch-top">
+        <span class="plat ${esc(c.platform)}">${esc(PLAT_LABELS[c.platform]||c.platform)}</span>
+        <span class="ch-name">${esc(c.name)}</span>
+        ${c.channel_id?`<a href="${platUrl(c)}" target="_blank" style="font-size:11px;color:var(--faint)">↗</a>`:''}
+      </div>
+      <div class="ch-stats">
+        <div class="ch-stat followers"><div class="v">${latest?fmt(latest.followers):'—'}</div><div class="l">Followers</div></div>
+        ${c.platform==='youtube'?`<div class="ch-stat views"><div class="v">${latest?fmt(latest.views):'—'}</div><div class="l">Total Views</div></div>`:''}
+        <div class="ch-stat posts"><div class="v">${latest?fmt(latest.posts):'—'}</div><div class="l">${c.platform==='youtube'?'Videos':'Posts'}</div></div>
+      </div>
+      ${snaps.length>1?`<div class="sparkline-wrap"><div class="sparkline-label">Follower growth</div>${sparkline(snaps.map(s=>Number(s.followers||0)))}</div>`:''}
+      <div class="ch-foot">
+        ${canFetch?`<button class="sm fetch-btn" data-id="${c.id}">⚡ Fetch latest</button>`:''}
+        <button class="sm ghost manual-btn" data-id="${c.id}" data-name="${esc(c.name)}">✏ Manual update</button>
+        ${latest?`<span class="last-updated">Last: ${timeAgo(latest.ts)}</span>`:''}
+        <button class="danger sm del-btn" data-id="${c.id}" style="margin-left:${latest?'0':'auto'}">remove</button>
+      </div>
+      ${extra.recentVideos?.length?renderVideos(extra.recentVideos):''}`;
+    grid.appendChild(card);
+  });
+  grid.querySelectorAll('.fetch-btn').forEach(b=>b.onclick=()=>fetchChannel(b.dataset.id,b));
+  grid.querySelectorAll('.manual-btn').forEach(b=>b.onclick=()=>openManual(b.dataset.id,b.dataset.name));
+  grid.querySelectorAll('.del-btn').forEach(b=>b.onclick=async()=>{
+    if(!confirm('Remove this channel and all its data?'))return;
+    await api('/api/reach/channels/'+b.dataset.id,{method:'DELETE'});loadChannels();
+  });
+}
+
+async function fetchChannel(id,btn){
+  if(btn){btn.disabled=true;btn.textContent='Fetching…';}
+  try{
+    const r=await api('/api/reach/fetch/'+id,{method:'POST',body:JSON.stringify({})});
+    if(r.error){alert('Error: '+r.error);return;}
+    loadChannels();
+  }catch(e){alert(e.message);}
+  finally{if(btn){btn.disabled=false;btn.textContent='⚡ Fetch latest';}}
+}
+
+$('#fetchAllBtn').onclick=async()=>{
+  const btn=$('#fetchAllBtn');
+  btn.disabled=true;btn.textContent='Fetching all…';
+  const channels=await api('/api/reach/channels?game='+currentGame);
+  const auto=channels.filter(c=>['youtube','instagram','facebook'].includes(c.platform));
+  await Promise.all(auto.map(c=>api('/api/reach/fetch/'+c.id,{method:'POST',body:JSON.stringify({})}).catch(()=>{})));
+  await loadChannels();
+  btn.disabled=false;btn.textContent='⚡ Fetch All';
+};
+
+$('#addChannelBtn').onclick=async()=>{
+  const name=$('#c_name').value.trim();
+  if(!name){alert('Enter a channel name.');return;}
+  await api('/api/reach/channels',{method:'POST',body:JSON.stringify({name,platform:$('#c_platform').value,channel_id:$('#c_id').value.trim(),game:currentGame})});
+  ['c_name','c_id'].forEach(id=>$('#'+id).value='');
+  flash('#addMsg');loadChannels();
+};
+
+// Manual modal
+function openManual(id,name){
+  manualChannelId=id;
+  $('#manualTitle').childNodes[0].textContent=`Update "${name}" `;
+  ['m_followers','m_views','m_posts'].forEach(id=>$('#'+id).value='');
+  $('#manualModal').classList.remove('hide');
+  setTimeout(()=>$('#m_followers').focus(),50);
+}
+$('#closeManual').onclick=()=>$('#manualModal').classList.add('hide');
+$('#manualModal').onclick=e=>{if(e.target===$('#manualModal'))$('#manualModal').classList.add('hide');};
+$('#saveManual').onclick=async()=>{
+  await api('/api/reach/manual/'+manualChannelId,{method:'POST',body:JSON.stringify({
+    followers:Number($('#m_followers').value)||0,
+    views:Number($('#m_views').value)||0,
+    posts:Number($('#m_posts').value)||0,
+  })});
+  $('#manualModal').classList.add('hide');loadChannels();
+};
+
+// Helpers
+function renderVideos(videos){
+  return `<div class="videos-section">
+    <div class="vs-title">Recent videos</div>
+    <div class="video-list">${videos.map(v=>`
+      <div class="video-row">
+        ${v.thumb?`<img class="video-thumb" src="${esc(v.thumb)}" loading="lazy"/>`:'<div class="video-thumb"></div>'}
+        <div class="video-info">
+          <div class="video-title"><a href="${esc(v.url)}" target="_blank">${esc(v.title)}</a></div>
+          <div class="video-meta">${fmt(v.views)} views · ${v.likes?fmt(v.likes)+' likes · ':''} ${v.published||''}</div>
+        </div>
+      </div>`).join('')}
+    </div>
+  </div>`;
+}
+
+function sparkline(vals){
+  if(vals.length<2)return '';
+  const w=300,h=40,pad=4;
+  const min=Math.min(...vals),max=Math.max(...vals);
+  const range=max-min||1;
+  const pts=vals.map((v,i)=>{
+    const x=pad+(i/(vals.length-1))*(w-pad*2);
+    const y=h-pad-(((v-min)/range)*(h-pad*2));
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">
+    <polyline points="${pts}" fill="none" stroke="var(--ok)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${pts.split(' ').pop().split(',')[0]}" cy="${pts.split(' ').pop().split(',')[1]}" r="3" fill="var(--ok)"/>
+  </svg>`;
+}
+
+function platUrl(c){
+  if(c.platform==='youtube'){
+    const id=c.channel_id;
+    return id.startsWith('UC')?`https://youtube.com/channel/${id}`:`https://youtube.com/${id.startsWith('@')?id:'@'+id}`;
+  }
+  if(c.platform==='instagram')return `https://instagram.com`;
+  if(c.platform==='facebook')return `https://facebook.com/${c.channel_id}`;
+  if(c.platform==='linkedin')return `https://linkedin.com`;
+  return '#';
+}
+
+function fmt(n){
+  n=Number(n)||0;
+  if(n>=1000000)return (n/1000000).toFixed(1)+'M';
+  if(n>=1000)return (n/1000).toFixed(1)+'K';
+  return String(n);
+}
+function tryParse(s){try{return JSON.parse(s||'{}');}catch{return {};}}
+function esc(s){return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function flash(sel){const el=$(sel);el.classList.add('show');setTimeout(()=>el.classList.remove('show'),3000);}
+function timeAgo(ts){
+  const d=Date.now()-Number(ts);
+  if(d<60000)return 'just now';
+  if(d<3600000)return Math.floor(d/60000)+'m ago';
+  if(d<86400000)return Math.floor(d/3600000)+'h ago';
+  return Math.floor(d/86400000)+'d ago';
+}
+
+if(TOKEN){api('/api/whoami').then(r=>r.ok?showApp():showGate('')).catch(()=>showGate(''));}
+else showGate('');
+</script>
+</body>
+</html>
