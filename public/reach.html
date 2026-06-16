@@ -128,6 +128,22 @@ svg.spark{display:block;overflow:visible}
 .modal h2 button{margin-left:auto;background:transparent;border:0;color:var(--muted);font-size:20px;padding:0}
 .empty-state{color:var(--muted);font-size:13px;text-align:center;padding:40px;border:1px dashed var(--line2);border-radius:14px}
 a{color:var(--clicks);text-decoration:none}
+
+/* post cards */
+.post-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+.post-card-top{display:flex;align-items:flex-start;gap:12px;margin-bottom:12px}
+.post-label{font-weight:600;font-size:14px;flex:1}
+.post-channel{font-size:12px;color:var(--accent);font-family:var(--mono);margin-top:3px}
+.post-stats{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:10px}
+.post-stat .v{font-family:var(--mono);font-size:18px;font-weight:700;line-height:1}
+.post-stat .l{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-top:3px}
+.post-stat.views .v{color:var(--clicks)}
+.post-stat.likes .v{color:var(--installs)}
+.post-stat.comments .v{color:var(--accent)}
+.post-growth{font-size:11px;font-family:var(--mono);padding:4px 8px;border-radius:5px;background:var(--panel2)}
+.post-growth.up{color:var(--ok)}
+.post-growth.flat{color:var(--faint)}
+.post-foot{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-top:10px;border-top:1px solid var(--line2)}
 </style>
 </head>
 <body>
@@ -188,6 +204,23 @@ a{color:var(--clicks);text-decoration:none}
     <div class="stat"><div class="v" id="totChannels">—</div><div class="l">Channels</div></div>
     <div class="stat"><div class="v" id="totPosts">—</div><div class="l">Total Posts</div></div>
   </div>
+
+  <!-- Tracked Posts -->
+  <div class="form">
+    <h3>🎬 Track a specific post</h3>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:16px">Paste any YouTube video link — from your channel or someone else's. Track its views, likes and comments over time.</p>
+    <label class="fld"><span class="k">YouTube Video URL</span>
+      <input id="p_url" type="url" placeholder="https://youtube.com/watch?v=… or youtu.be/…"/></label>
+    <label class="fld"><span class="k">Label <em>— optional, auto-filled from video title</em></span>
+      <input id="p_label" placeholder="e.g. TMKOC promo on KidsRhymes channel"/></label>
+    <div class="actions">
+      <button id="addPostBtn">+ Track Post</button>
+      <span class="msg" id="postMsg">Added!</span>
+    </div>
+  </div>
+
+  <p class="eyebrow" id="postsEyebrow" style="display:none">Tracked posts</p>
+  <div id="postGrid" style="display:flex;flex-direction:column;gap:12px;margin-bottom:32px"></div>
 
   <!-- Add channel form -->
   <div class="form">
@@ -257,7 +290,7 @@ function showApp(){
   $('#sidebar').classList.remove('hide');$('#app').classList.remove('hide');
   $('#origin').textContent=location.hostname;
   applyGame(currentGame,false);
-  loadChannels();
+  loadChannels();loadPosts();
 }
 $('#enter').onclick=tryToken;
 $('#token').addEventListener('keydown',e=>{if(e.key==='Enter')tryToken();});
@@ -274,7 +307,7 @@ function applyGame(game,reload=true){
   localStorage.setItem('trackr_game',game);
   document.querySelectorAll('.game-pill').forEach(p=>p.classList.toggle('active',p.dataset.game===game));
   $('#gameLabel').textContent=GAME_NAMES[game]||game;
-  if(reload)loadChannels();
+  if(reload){loadChannels();loadPosts();}
 }
 document.querySelectorAll('.game-pill').forEach(p=>{p.onclick=()=>{if(p.dataset.game!==currentGame)applyGame(p.dataset.game);};});
 
@@ -443,6 +476,80 @@ function timeAgo(ts){
   if(d<86400000)return Math.floor(d/3600000)+'h ago';
   return Math.floor(d/86400000)+'d ago';
 }
+
+// ===== POST TRACKING =====
+$('#addPostBtn').onclick = async () => {
+  const url = $('#p_url').value.trim();
+  if (!url) { alert('Paste a YouTube URL first.'); return; }
+  const btn = $('#addPostBtn');
+  btn.disabled = true; btn.textContent = 'Adding…';
+  try {
+    const r = await api('/api/reach/posts', { method: 'POST', body: JSON.stringify({ url, label: $('#p_label').value.trim(), game: currentGame }) });
+    if (r.error) { alert('Error: ' + r.error); return; }
+    $('#p_url').value = ''; $('#p_label').value = '';
+    flash('#postMsg'); loadPosts();
+  } catch(e) { alert(e.message); }
+  finally { btn.disabled = false; btn.textContent = '+ Track Post'; }
+};
+
+async function loadPosts() {
+  const posts = await api('/api/reach/posts?game=' + currentGame);
+  const grid = $('#postGrid');
+  const eyebrow = $('#postsEyebrow');
+  if (!posts.length) { grid.innerHTML = ''; eyebrow.style.display = 'none'; return; }
+  eyebrow.style.display = 'block';
+  // Fetch snapshots for each post
+  const data = await Promise.all(posts.map(async p => {
+    const snaps = await api('/api/reach/post-snapshots/' + p.id);
+    return { post: p, snaps };
+  }));
+  grid.innerHTML = '';
+  data.forEach(({ post: p, snaps }) => {
+    const latest = snaps.length ? snaps[snaps.length - 1] : null;
+    const prev = snaps.length > 1 ? snaps[snaps.length - 2] : null;
+    const viewGrowth = latest && prev ? Number(latest.views) - Number(prev.views) : null;
+    const card = document.createElement('div');
+    card.className = 'post-card';
+    card.innerHTML = `
+      <div class="post-card-top">
+        <div style="flex:1">
+          <div class="post-label"><a href="https://youtube.com/watch?v=${esc(p.post_id)}" target="_blank">${esc(p.label)}</a></div>
+          ${p.channel_name ? `<div class="post-channel">📺 ${esc(p.channel_name)}</div>` : ''}
+        </div>
+        ${viewGrowth !== null ? `<span class="post-growth ${viewGrowth > 0 ? 'up' : 'flat'}">+${fmt(viewGrowth)} views since last check</span>` : ''}
+      </div>
+      <div class="post-stats">
+        <div class="post-stat views"><div class="v">${latest ? fmt(latest.views) : '—'}</div><div class="l">Views</div></div>
+        <div class="post-stat likes"><div class="v">${latest ? fmt(latest.likes) : '—'}</div><div class="l">Likes</div></div>
+        <div class="post-stat comments"><div class="v">${latest ? fmt(latest.comments) : '—'}</div><div class="l">Comments</div></div>
+      </div>
+      ${snaps.length > 1 ? `<div style="margin-bottom:10px"><div class="sparkline-label" style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);margin-bottom:4px;font-family:var(--mono)">View growth</div>${sparkline(snaps.map(s => Number(s.views || 0)))}</div>` : ''}
+      <div class="post-foot">
+        <button class="sm fetch-post-btn" data-id="${p.id}">⚡ Refresh stats</button>
+        <span style="font-size:11px;color:var(--faint);font-family:var(--mono)">${latest ? timeAgo(latest.ts) : 'no data yet'}</span>
+        <button class="danger sm del-post-btn" data-id="${p.id}" style="margin-left:auto">remove</button>
+      </div>`;
+    grid.appendChild(card);
+  });
+  grid.querySelectorAll('.fetch-post-btn').forEach(b => b.onclick = async () => {
+    b.disabled = true; b.textContent = 'Refreshing…';
+    try {
+      const r = await api('/api/reach/posts/fetch/' + b.dataset.id, { method: 'POST', body: '{}' });
+      if (r.error) alert('Error: ' + r.error);
+      else loadPosts();
+    } catch(e) { alert(e.message); }
+    finally { b.disabled = false; b.textContent = '⚡ Refresh stats'; }
+  });
+  grid.querySelectorAll('.del-post-btn').forEach(b => b.onclick = async () => {
+    if (!confirm('Stop tracking this post?')) return;
+    await api('/api/reach/posts/' + b.dataset.id, { method: 'DELETE' });
+    loadPosts();
+  });
+}
+
+// Override loadChannels to also load posts
+const _origLoadChannels = loadChannels;
+async function loadAll2() { await Promise.all([loadChannels(), loadPosts()]); }
 
 if(TOKEN){api('/api/whoami').then(r=>r.ok?showApp():showGate('')).catch(()=>showGate(''));}
 else showGate('');

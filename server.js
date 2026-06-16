@@ -360,6 +360,81 @@ CAPTION: [social media caption with emojis]`;
   }
 });
 
+// ========== POST TRACKING ==========
+
+function extractYouTubeVideoId(url) {
+  const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/);
+  return m ? m[1] : url.trim();
+}
+
+app.get('/api/reach/posts', requireAdmin, async (req, res) => {
+  const game = req.query.game || 'tmkoc';
+  const r = await db.execute({ sql: 'SELECT * FROM social_posts WHERE game = ? ORDER BY created_at DESC', args: [game] });
+  res.json(r.rows);
+});
+
+app.post('/api/reach/posts', requireAdmin, async (req, res) => {
+  const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
+  if (!YOUTUBE_API_KEY) return res.status(400).json({ error: 'YOUTUBE_API_KEY not set.' });
+
+  const { url, label, game = 'tmkoc' } = req.body;
+  if (!url) return res.status(400).json({ error: 'url required' });
+
+  const videoId = extractYouTubeVideoId(url);
+  // Fetch video details to auto-fill label and channel
+  try {
+    const r2 = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${encodeURIComponent(videoId)}&key=${YOUTUBE_API_KEY}`);
+    const d = await r2.json();
+    if (d.error) return res.status(400).json({ error: d.error.message });
+    const item = d.items?.[0];
+    if (!item) return res.status(400).json({ error: 'Video not found. Check the URL.' });
+
+    const title = label || item.snippet?.title || videoId;
+    const channelName = item.snippet?.channelTitle || '';
+    const r3 = await db.execute({ sql: 'INSERT INTO social_posts (label, platform, post_id, channel_name, game, created_at) VALUES (?,?,?,?,?,?)', args: [title, 'youtube', videoId, channelName, game, Date.now()] });
+    const insertedId = Number(r3.lastInsertRowid);
+
+    // Save initial snapshot
+    const stats = item.statistics;
+    await db.execute({ sql: 'INSERT INTO social_post_snapshots (post_id, ts, views, likes, comments) VALUES (?,?,?,?,?)', args: [insertedId, Date.now(), parseInt(stats?.viewCount)||0, parseInt(stats?.likeCount)||0, parseInt(stats?.commentCount)||0] });
+
+    res.json({ ok: true, id: insertedId, title, channelName });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/reach/posts/fetch/:id', requireAdmin, async (req, res) => {
+  const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
+  if (!YOUTUBE_API_KEY) return res.status(400).json({ error: 'YOUTUBE_API_KEY not set.' });
+
+  const post = (await db.execute({ sql: 'SELECT * FROM social_posts WHERE id = ?', args: [req.params.id] })).rows[0];
+  if (!post) return res.status(404).json({ error: 'post not found' });
+
+  try {
+    const r2 = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${encodeURIComponent(post.post_id)}&key=${YOUTUBE_API_KEY}`);
+    const d = await r2.json();
+    const stats = d.items?.[0]?.statistics;
+    if (!stats) return res.status(400).json({ error: 'Could not fetch video stats.' });
+    const views = parseInt(stats.viewCount)||0, likes = parseInt(stats.likeCount)||0, comments = parseInt(stats.commentCount)||0;
+    await db.execute({ sql: 'INSERT INTO social_post_snapshots (post_id, ts, views, likes, comments) VALUES (?,?,?,?,?)', args: [post.id, Date.now(), views, likes, comments] });
+    res.json({ ok: true, views, likes, comments });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete('/api/reach/posts/:id', requireAdmin, async (req, res) => {
+  await db.execute({ sql: 'DELETE FROM social_posts WHERE id = ?', args: [req.params.id] });
+  await db.execute({ sql: 'DELETE FROM social_post_snapshots WHERE post_id = ?', args: [req.params.id] });
+  res.json({ ok: true });
+});
+
+app.get('/api/reach/post-snapshots/:postId', requireAdmin, async (req, res) => {
+  const r = await db.execute({ sql: 'SELECT * FROM social_post_snapshots WHERE post_id = ? ORDER BY ts ASC', args: [req.params.postId] });
+  res.json(r.rows);
+});
+
 // ========== SOCIAL REACH ==========
 
 app.get('/api/reach/channels', requireAdmin, async (req, res) => {
